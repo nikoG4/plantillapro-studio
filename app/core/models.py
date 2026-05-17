@@ -31,6 +31,7 @@ class FieldStyle:
     auto_fit: bool = True
     word_wrap: bool = True
     single_line: bool = False
+    words_per_line: int = 0
     padding: int = 8
     rotation: float = 0.0
     print_border: bool = False

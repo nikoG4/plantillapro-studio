@@ -117,6 +117,16 @@ def load_font(style: FieldStyle, size: int) -> ImageFont.FreeTypeFont | ImageFon
 def _layout_text(text: str, font: ImageFont.ImageFont, max_width: int, style: FieldStyle) -> list[str]:
     if style.single_line:
         return [text.replace("\n", " ")]
+    if style.words_per_line > 0:
+        lines: list[str] = []
+        for raw_line in text.splitlines() or [""]:
+            words = raw_line.split()
+            if not words:
+                lines.append("")
+                continue
+            for index in range(0, len(words), style.words_per_line):
+                lines.append(" ".join(words[index : index + style.words_per_line]))
+        return lines
     lines: list[str] = []
     for raw_line in text.splitlines() or [""]:
         if not style.word_wrap:

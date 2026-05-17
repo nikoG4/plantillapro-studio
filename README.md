@@ -7,7 +7,7 @@ Aplicacion de escritorio para generar documentos personalizados por lotes desde 
 - Carga de imagenes PNG, JPG y JPEG sin deformarlas.
 - Canvas central con zoom por rueda, pan con boton medio o `Espacio + arrastrar`.
 - Creacion, movimiento, redimensionado con ocho tiradores, duplicado y borrado de rectangulos de texto.
-- Campos configurables con plantilla `{{nombre}}`, fuente del sistema o TTF externo, tamano, color, alineacion, margen, autoajuste, mayusculas/minusculas/capitalizacion, interlineado, salto de linea y borde opcional.
+- Campos configurables con plantilla `{{nombre}}`, fuente del sistema o TTF externo, tamano, color, alineacion, margen, autoajuste, mayusculas/minusculas/capitalizacion, interlineado, salto de linea, corte cada N palabras y borde opcional.
 - Carga de datos desde TXT, CSV, XLSX o portapapeles.
 - Tabla editable para agregar, borrar o modificar filas.
 - Boton **Generar** que abre el visor interno con el lote renderizado, navegacion por filas, impresion directa, guardado PDF y exportacion de imagenes.
@@ -42,6 +42,7 @@ python main.py
    - Texto: `{{nombre}}`
    - Fuente del sistema o archivo TTF externo.
    - Transformar texto: `normal`, `upper`, `lower` o `title`.
+   - Palabras por linea: `0` para automatico o, por ejemplo, `2` para cortar nombres en grupos de dos palabras.
    - Alineacion horizontal: `center`.
    - Alineacion vertical: `center`.
    - Autoajustar: activado.

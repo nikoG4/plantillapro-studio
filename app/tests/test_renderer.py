@@ -4,7 +4,7 @@ from PIL import Image
 
 from app.core.models import FieldStyle, TextField
 from app.core.pdf_exporter import export_pdf
-from app.core.renderer import render_template, render_text_template
+from app.core.renderer import _layout_text, load_font, render_template, render_text_template
 
 
 def test_replace_variables():
@@ -33,6 +33,12 @@ def test_text_case_lower_and_title_render_without_crashing(tmp_path):
     title = TextField(id="2", x=200, y=20, width=180, height=80, style=FieldStyle(text_case="title"))
     image = render_template(image_path, [lower, title], {"nombre": "ANA MARIA"})
     assert image.size == (400, 200)
+
+
+def test_words_per_line_splits_fixed_word_groups():
+    style = FieldStyle(words_per_line=2)
+    font = load_font(style, 24)
+    assert _layout_text("JUAN CARLOS PEREZ GOMEZ", font, 400, style) == ["JUAN CARLOS", "PEREZ GOMEZ"]
 
 
 def test_export_pdf_with_three_pages(tmp_path):
