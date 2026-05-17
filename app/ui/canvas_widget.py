@@ -6,7 +6,7 @@ from pathlib import Path
 from PIL import Image
 from PIL.ImageQt import ImageQt
 from PySide6.QtCore import QPoint, QPointF, QRectF, Qt, Signal
-from PySide6.QtGui import QAction, QColor, QImage, QMouseEvent, QPainter, QPen, QPixmap, QWheelEvent
+from PySide6.QtGui import QAction, QColor, QImage, QKeyEvent, QMouseEvent, QPainter, QPen, QPixmap, QWheelEvent
 from PySide6.QtWidgets import QMenu, QWidget
 
 from app.core.models import FieldStyle, TextField
@@ -21,6 +21,7 @@ class CanvasWidget(QWidget):
         super().__init__()
         self.setMinimumSize(640, 420)
         self.setMouseTracking(True)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.image_path = ""
         self.image_size = (0, 0)
         self._pixmap: QPixmap | None = None
@@ -30,6 +31,7 @@ class CanvasWidget(QWidget):
         self.offset = QPointF(30, 30)
         self._mode = "idle"
         self._resize_handle = ""
+        self._space_pressed = False
         self._start = QPointF()
         self._last = QPointF()
         self._start_rect: QRectF | None = None
@@ -135,24 +137,25 @@ class CanvasWidget(QWidget):
         self.statusChanged.emit(f"Zoom: {self.scale * 100:.0f}%")
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
+        self.setFocus()
         if event.button() == Qt.MouseButton.RightButton:
             self._show_menu(event.pos())
             return
-        if event.button() == Qt.MouseButton.MiddleButton or (event.button() == Qt.MouseButton.LeftButton and event.modifiers() & Qt.KeyboardModifier.SpaceModifier):
+        if event.button() == Qt.MouseButton.MiddleButton or (event.button() == Qt.MouseButton.LeftButton and self._space_pressed):
             self._mode = "pan"
             self._last = QPointF(event.position())
             return
         if event.button() != Qt.MouseButton.LeftButton or not self._pixmap:
             return
         pos = self._to_image(event.position())
-        hit = self._hit_field(pos)
+        hit, handle = self._hit_field_and_handle(pos)
         self._start = pos
         self._last = QPointF(event.position())
         if hit:
             self.selected_id = hit.id
             self.fieldSelected.emit(hit)
             self._start_rect = QRectF(hit.x, hit.y, hit.width, hit.height)
-            self._resize_handle = self._handle_at(hit, pos)
+            self._resize_handle = handle
             self._mode = "resize" if self._resize_handle else "move"
             self.setCursor(self._cursor_for_handle(self._resize_handle) if self._resize_handle else Qt.CursorShape.SizeAllCursor)
         else:
@@ -172,8 +175,13 @@ class CanvasWidget(QWidget):
             return
         field = self.selected_field()
         if field and self._mode == "idle":
-            handle = self._handle_at(field, self._to_image(event.position()))
-            self.setCursor(self._cursor_for_handle(handle) if handle else Qt.CursorShape.ArrowCursor)
+            hit, handle = self._hit_field_and_handle(self._to_image(event.position()))
+            if handle:
+                self.setCursor(self._cursor_for_handle(handle))
+            elif hit:
+                self.setCursor(Qt.CursorShape.SizeAllCursor)
+            else:
+                self.setCursor(Qt.CursorShape.ArrowCursor)
         if not field or self._mode == "idle":
             return
         pos = self._to_image(event.position())
@@ -194,11 +202,33 @@ class CanvasWidget(QWidget):
         self.update()
 
     def mouseReleaseEvent(self, _event: QMouseEvent) -> None:
+        field = self.selected_field()
+        if field and self._mode == "draw":
+            field.width = max(24, field.width)
+            field.height = max(24, field.height)
+            self.fieldSelected.emit(field)
         if self._mode in {"draw", "move", "resize"}:
             self.fieldsChanged.emit()
         self._mode = "idle"
         self._resize_handle = ""
         self._start_rect = None
+        self.unsetCursor()
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        if event.key() == Qt.Key.Key_Space:
+            self._space_pressed = True
+            self.setCursor(Qt.CursorShape.OpenHandCursor)
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+    def keyReleaseEvent(self, event: QKeyEvent) -> None:
+        if event.key() == Qt.Key.Key_Space:
+            self._space_pressed = False
+            self.unsetCursor()
+            event.accept()
+            return
+        super().keyReleaseEvent(event)
 
     def _to_image(self, point: QPointF | QPoint) -> QPointF:
         pos = (QPointF(point) - self.offset) / self.scale
@@ -206,15 +236,29 @@ class CanvasWidget(QWidget):
 
     def _hit_field(self, pos: QPointF) -> TextField | None:
         for field in reversed(self.fields):
-            if QRectF(field.x, field.y, field.width, field.height).contains(pos):
+            tolerance = max(4, 8 / self.scale)
+            if QRectF(field.x, field.y, field.width, field.height).adjusted(-tolerance, -tolerance, tolerance, tolerance).contains(pos):
                 return field
         return None
+
+    def _hit_field_and_handle(self, pos: QPointF) -> tuple[TextField | None, str]:
+        selected = self.selected_field()
+        if selected:
+            handle = self._handle_at(selected, pos)
+            if handle:
+                return selected, handle
+        for field in reversed(self.fields):
+            handle = self._handle_at(field, pos)
+            if handle:
+                return field, handle
+        hit = self._hit_field(pos)
+        return hit, ""
 
     def _near_resize_handle(self, field: TextField, pos: QPointF) -> bool:
         return bool(self._handle_at(field, pos))
 
     def _handle_at(self, field: TextField, pos: QPointF) -> str:
-        size = 10 / self.scale
+        size = max(12, 18 / self.scale)
         for name, rect in self._handle_rects(field, size).items():
             if rect.contains(pos):
                 return name

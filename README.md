@@ -10,7 +10,7 @@ Aplicacion de escritorio para generar documentos personalizados por lotes desde 
 - Campos configurables con plantilla `{{nombre}}`, fuente del sistema o TTF externo, tamano, color, alineacion, margen, autoajuste, mayusculas/minusculas/capitalizacion, interlineado, salto de linea y borde opcional.
 - Carga de datos desde TXT, CSV, XLSX o portapapeles.
 - Tabla editable para agregar, borrar o modificar filas.
-- Visor interno con navegacion por filas e impresion directa de la pagina actual o de todo el lote.
+- Boton **Generar** que abre el visor interno con el lote renderizado, navegacion por filas, impresion directa, guardado PDF y exportacion de imagenes.
 - Exportacion a PDF unico con una pagina por fila.
 - Exportacion opcional de imagenes individuales PNG/JPG con nombres sanitizados para Windows.
 - Guardado y apertura de proyectos JSON.
@@ -47,7 +47,7 @@ python main.py
    - Autoajustar: activado.
 5. Cargar datos con **Cargar datos** o **Pegar lista**.
 6. Revisar la tabla editable.
-7. Pulsar **Previsualizar** para abrir el visor.
+7. Pulsar **Generar** para abrir el visor del lote.
 8. Desde el visor se puede imprimir la pagina actual o todo el lote sin exportar PDF.
 9. Opcionalmente pulsar **Generar PDF** o **Exportar imagenes**.
 

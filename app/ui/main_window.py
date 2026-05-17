@@ -64,7 +64,8 @@ class MainWindow(QMainWindow):
             ("Agregar campo", self.add_field),
             ("Duplicar", lambda: self.canvas.duplicate_selected()),
             ("Borrar", lambda: self.canvas.delete_selected()),
-            ("Previsualizar", self.preview),
+            ("Generar", self.open_generated_viewer),
+            ("Previsualizar fila", self.preview),
             ("Generar PDF", self.generate_pdf),
             ("Exportar imágenes", self.generate_images),
         ]
@@ -196,7 +197,14 @@ class MainWindow(QMainWindow):
         index, ok = QInputDialog.getInt(self, "Fila a previsualizar", "Número de fila", 1, 1, len(rows))
         if not ok:
             return
-        PreviewDialog(self.project.image_path, self.project.fields, rows, index - 1, self).exec()
+        self._sync_export_settings()
+        PreviewDialog(self.project.image_path, self.project.fields, rows, self.project.export, index - 1, self).exec()
+
+    def open_generated_viewer(self) -> None:
+        if not self._validate(require_output=False):
+            return
+        self._sync_export_settings()
+        PreviewDialog(self.project.image_path, self.project.fields, self._table_rows(), self.project.export, 0, self).exec()
 
     def generate_pdf(self) -> None:
         if not self._validate(require_output=False):
