@@ -1,9 +1,7 @@
 from __future__ import annotations
-
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Any
-
 
 class PageSize(str, Enum):
     ORIGINAL = "original"
@@ -13,6 +11,13 @@ class PageSize(str, Enum):
     LETTER_LANDSCAPE = "letter_landscape"
     CUSTOM = "custom"
 
+class FillMode(str, Enum):
+    GRID = "grid"
+    VERTICAL_ONLY = "vertical_only"
+
+class OrderMode(str, Enum):
+    NORMAL = "normal"
+    CUT_STACK = "cut_stack"
 
 @dataclass
 class FieldStyle:
@@ -37,7 +42,6 @@ class FieldStyle:
     print_border: bool = False
     border_color: str = "#3b82f6"
 
-
 @dataclass
 class TextField:
     id: str
@@ -49,6 +53,17 @@ class TextField:
     height: int = 120
     style: FieldStyle = field(default_factory=FieldStyle)
 
+@dataclass
+class NumberingSettings:
+    enabled: bool = False
+    start: int = 1
+    count: int = 100
+    step: int = 1
+    digits: int = 0
+    field_name: str = "numero"
+    prefix: str = ""
+    suffix: str = ""
+    override_existing: bool = False
 
 @dataclass
 class ExportSettings:
@@ -62,7 +77,18 @@ class ExportSettings:
     filename_pattern: str = "{{numero}}_{{nombre}}"
     jpeg_quality: int = 95
     max_quality_pdf: bool = True
-
+    use_original_piece_size: bool = True
+    piece_width_mm: float = 50.0
+    piece_height_mm: float = 30.0
+    margin_left_mm: float = 5.0
+    margin_top_mm: float = 5.0
+    margin_right_mm: float = 5.0
+    margin_bottom_mm: float = 5.0
+    gap_x_mm: float = 2.0
+    gap_y_mm: float = 2.0
+    fill_mode: FillMode = FillMode.GRID
+    order_mode: OrderMode = OrderMode.NORMAL
+    numbering: NumberingSettings = field(default_factory=NumberingSettings)
 
 @dataclass
 class TemplateProject:
@@ -73,30 +99,25 @@ class TemplateProject:
     data: list[dict[str, str]] = field(default_factory=list)
     export: ExportSettings = field(default_factory=ExportSettings)
 
-
 def _enum_to_value(value: Any) -> Any:
-    if isinstance(value, Enum):
-        return value.value
-    if isinstance(value, dict):
-        return {k: _enum_to_value(v) for k, v in value.items()}
-    if isinstance(value, list):
-        return [_enum_to_value(v) for v in value]
+    if isinstance(value, Enum): return value.value
+    if isinstance(value, dict): return {k: _enum_to_value(v) for k, v in value.items()}
+    if isinstance(value, list): return [_enum_to_value(v) for v in value]
     return value
-
 
 def project_to_dict(project: TemplateProject) -> dict[str, Any]:
     return _enum_to_value(asdict(project))
 
-
 def project_from_dict(raw: dict[str, Any]) -> TemplateProject:
-    export_raw = raw.get("export", {}) or {}
-    if "page_size" in export_raw:
-        export_raw["page_size"] = PageSize(export_raw["page_size"])
+    export_raw = dict(raw.get("export", {}) or {})
+    if "page_size" in export_raw: export_raw["page_size"] = PageSize(export_raw["page_size"])
+    if "fill_mode" in export_raw: export_raw["fill_mode"] = FillMode(export_raw["fill_mode"])
+    if "order_mode" in export_raw: export_raw["order_mode"] = OrderMode(export_raw["order_mode"])
+    export_raw["numbering"] = NumberingSettings(**dict(export_raw.get("numbering", {}) or {}))
     fields: list[TextField] = []
     for item in raw.get("fields", []) or []:
-        style_raw = item.get("style", {}) or {}
-        if style_raw.get("uppercase") and "text_case" not in style_raw:
-            style_raw["text_case"] = "upper"
+        style_raw = dict(item.get("style", {}) or {})
+        if style_raw.get("uppercase") and "text_case" not in style_raw: style_raw["text_case"] = "upper"
         style = FieldStyle(**style_raw)
         data = {k: v for k, v in item.items() if k != "style"}
         fields.append(TextField(**data, style=style))
