@@ -1,0 +1,58 @@
+name: Verify PlantillaPro Studio v1.0.0 release
+
+on:
+  pull_request:
+    types: [closed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  verify:
+    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.merged == true && github.event.pull_request.title == 'verify-release: v1.0.0')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for release assets and report
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="v1.0.0"
+          zip_name="PlantillaProStudio-v1.0.0-windows-x64.zip"
+          checksum_name="SHA256SUMS.txt"
+
+          for attempt in $(seq 1 20); do
+            json="$(gh release view "$tag" --repo "${{ github.repository }}" --json tagName,url,assets 2>/dev/null || true)"
+            zip_count="$(printf '%s' "$json" | jq --arg name "$zip_name" '[.assets[]? | select(.name == $name)] | length')"
+            checksum_count="$(printf '%s' "$json" | jq --arg name "$checksum_name" '[.assets[]? | select(.name == $name)] | length')"
+
+            if [ "$zip_count" -eq 1 ] && [ "$checksum_count" -eq 1 ]; then
+              release_url="$(printf '%s' "$json" | jq -r '.url')"
+              zip_size="$(printf '%s' "$json" | jq -r --arg name "$zip_name" '.assets[] | select(.name == $name) | .size')"
+              zip_url="$(printf '%s' "$json" | jq -r --arg name "$zip_name" '.assets[] | select(.name == $name) | .url')"
+              checksum_url="$(printf '%s' "$json" | jq -r --arg name "$checksum_name" '.assets[] | select(.name == $name) | .url')"
+              body=$(cat <<EOF
+Release verificado correctamente.
+
+- Tag: $tag
+- Release: $release_url
+- Paquete: $zip_name
+- Tamaño: $zip_size bytes
+- Descarga: $zip_url
+- Checksum: $checksum_url
+- Workflow run: ${{ github.run_id }}
+EOF
+)
+              gh issue create --repo "${{ github.repository }}" --title "Release v1.0.0 verified" --body "$body"
+              exit 0
+            fi
+
+            echo "Intento $attempt/20: assets todavía no disponibles."
+            sleep 30
+          done
+
+          gh issue create --repo "${{ github.repository }}" --title "Release v1.0.0 verification failed" --body "El release existe, pero no aparecieron ambos assets después de 10 minutos. Workflow run: ${{ github.run_id }}"
+          exit 1
