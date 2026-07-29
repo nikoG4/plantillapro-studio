@@ -21,7 +21,7 @@ Descarga `PlantillaProStudio-v1.0.0-windows-x64.zip`, descomprímelo y ejecuta:
 
 `PlantillaProStudio.exe`
 
-No es necesario instalar Python.
+No es necesario instalar Python. Paquete preparado para Windows 10 y Windows 11 de 64 bits.
 
 ## Verificación
 
