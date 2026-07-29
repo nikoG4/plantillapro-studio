@@ -1,0 +1,1 @@
+Este archivo dispara la verificación final del paquete Windows de PlantillaPro Studio v1.0.0.
