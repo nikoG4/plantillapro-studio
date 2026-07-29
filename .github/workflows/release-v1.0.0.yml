@@ -3,6 +3,8 @@ name: Publish PlantillaPro Studio v1.0.0
 on:
   push:
     branches: [master]
+  pull_request:
+    types: [closed]
   workflow_dispatch:
 
 permissions:
@@ -10,6 +12,7 @@ permissions:
 
 jobs:
   release:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.event.pull_request.title == 'publish: v1.0.0')
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -30,7 +33,7 @@ jobs:
           gh release view $tag 2>$null 1>$null
           if ($LASTEXITCODE -ne 0) {
             gh release create $tag `
-              --target "${{ github.sha }}" `
+              --target "master" `
               --title "PlantillaPro Studio v1.0.0" `
               --notes-file RELEASE_NOTES_v1.0.0.md
           } else {
