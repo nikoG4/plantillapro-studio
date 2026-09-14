@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 
-from app.core.models import DocumentSettings, ExportSettings, TemplateProject, TextField, project_from_dict, project_to_dict
+from app.core.models import TemplateProject, TextField, project_from_dict, project_to_dict
 from app.core.production import build_production_rows, production_errors, suggested_filename_pattern
 from app.ui.data_table import DataTableWidget
 from app.ui.new_document_dialog import NewDocumentDialog
@@ -48,6 +47,20 @@ def test_static_and_variable_fields_round_trip_and_legacy_upgrade() -> None:
     assert legacy.fields[0].variable_name == "nombre"
 
 
+def test_legacy_global_numbering_becomes_field_numbering() -> None:
+    legacy = project_from_dict({
+        "fields": [{"id": "n", "name": "numero", "template": "{{numero}}", "style": {}}],
+        "export": {"numbering": {"enabled": True, "start": 10, "count": 3, "step": 5, "digits": 3, "field_name": "numero", "prefix": "N-"}},
+    })
+    field = legacy.fields[0]
+    assert field.production_source == "numbering"
+    assert field.number_start == 10
+    assert field.number_count == 3
+    assert field.number_step == 5
+    assert field.number_digits == 3
+    assert field.number_prefix == "N-"
+
+
 def test_variable_can_map_to_data_column() -> None:
     field = TextField(
         id="name", name="Nombre invitado", text_mode="variable", variable_name="invitado",
@@ -70,6 +83,14 @@ def test_variable_can_generate_numbering_without_data_rows() -> None:
     produced = build_production_rows([field], [])
     assert [row["ticket"] for row in produced] == ["T-007", "T-009", "T-011"]
     assert [row["numero"] for row in produced] == ["1", "2", "3"]
+
+
+def test_data_list_drives_copy_count_when_numbering_is_also_used() -> None:
+    name = TextField(id="name", name="Nombre", text_mode="variable", variable_name="nombre", production_source="column", source_column="cliente")
+    number = TextField(id="num", name="Número", text_mode="variable", variable_name="ticket", production_source="numbering", number_start=1, number_count=100, number_digits=3)
+    produced = build_production_rows([name, number], [{"cliente": "Ana"}, {"cliente": "Luis"}])
+    assert len(produced) == 2
+    assert [row["ticket"] for row in produced] == ["001", "002"]
 
 
 def test_filename_modes_are_explicit() -> None:
