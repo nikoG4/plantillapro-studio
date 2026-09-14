@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from enum import Enum
+import re
 from typing import Any
 
 
@@ -26,11 +27,11 @@ class OrderMode(str, Enum):
 
 @dataclass
 class DocumentSettings:
-    width: int = 1080
-    height: int = 1080
+    width: int = 2480
+    height: int = 3508
     background_color: str = "#ffffff"
     transparent: bool = False
-    preset: str = "custom"
+    preset: str = "a4"
 
 
 @dataclass
@@ -60,8 +61,8 @@ class FieldStyle:
 @dataclass
 class TextField:
     id: str
-    name: str = "nombre"
-    template: str = "{{nombre}}"
+    name: str = "Texto"
+    template: str = "Texto"
     x: int = 0
     y: int = 0
     width: int = 400
@@ -72,6 +73,26 @@ class TextField:
     visible: bool = True
     z_index: int = 100
     group_id: str = ""
+    text_mode: str = "static"
+    variable_name: str = ""
+    production_source: str = "column"
+    source_column: str = ""
+    number_start: int = 1
+    number_step: int = 1
+    number_digits: int = 0
+    number_prefix: str = ""
+    number_suffix: str = ""
+    number_count: int = 100
+
+    def is_variable(self) -> bool:
+        return self.text_mode == "variable"
+
+    def variable_key(self) -> str:
+        return (self.variable_name or self.name or "campo").strip().replace(" ", "_")
+
+    def sync_variable_template(self) -> None:
+        if self.is_variable():
+            self.template = "{{" + self.variable_key() + "}}"
 
 
 @dataclass
@@ -147,7 +168,10 @@ class ExportSettings:
     output_pdf: str = ""
     output_folder: str = ""
     image_format: str = "PNG"
-    filename_pattern: str = "{{numero}}_{{nombre}}"
+    filename_pattern: str = "{{numero}}"
+    filename_mode: str = "number"
+    filename_field_id: str = ""
+    filename_custom: str = ""
     jpeg_quality: int = 95
     max_quality_pdf: bool = True
     use_original_piece_size: bool = True
@@ -176,8 +200,8 @@ class TemplateProject:
     export: ExportSettings = field(default_factory=ExportSettings)
 
     def document_size(self) -> tuple[int, int]:
-        width = self.document.width or self.image_width or 1080
-        height = self.document.height or self.image_height or 1080
+        width = self.document.width or self.image_width or 2480
+        height = self.document.height or self.image_height or 3508
         return max(1, int(width)), max(1, int(height))
 
 
@@ -205,6 +229,11 @@ def _graphic_element_from_dict(raw: dict[str, Any]) -> GraphicElement:
     return ShapeElement(**{k: v for k, v in data.items() if k in allowed})
 
 
+def _legacy_variable(template: str) -> str:
+    match = re.fullmatch(r"\s*{{\s*([^{}]+?)\s*}}\s*", template or "")
+    return match.group(1).strip() if match else ""
+
+
 def project_from_dict(raw: dict[str, Any]) -> TemplateProject:
     export_raw = dict(raw.get("export", {}) or {})
     if "page_size" in export_raw:
@@ -213,7 +242,8 @@ def project_from_dict(raw: dict[str, Any]) -> TemplateProject:
         export_raw["fill_mode"] = FillMode(export_raw["fill_mode"])
     if "order_mode" in export_raw:
         export_raw["order_mode"] = OrderMode(export_raw["order_mode"])
-    export_raw["numbering"] = NumberingSettings(**dict(export_raw.get("numbering", {}) or {}))
+    legacy_numbering = NumberingSettings(**dict(export_raw.get("numbering", {}) or {}))
+    export_raw["numbering"] = legacy_numbering
 
     fields: list[TextField] = []
     for item in raw.get("fields", []) or []:
@@ -222,19 +252,46 @@ def project_from_dict(raw: dict[str, Any]) -> TemplateProject:
             style_raw["text_case"] = "upper"
         style = FieldStyle(**style_raw)
         data = {k: v for k, v in item.items() if k != "style"}
+        if "text_mode" not in data:
+            legacy_key = _legacy_variable(str(data.get("template", "")))
+            if legacy_key:
+                data["text_mode"] = "variable"
+                data["variable_name"] = legacy_key
+                data["source_column"] = legacy_key
+            else:
+                data["text_mode"] = "static"
         allowed = set(TextField.__dataclass_fields__) - {"style"}
-        fields.append(TextField(**{k: v for k, v in data.items() if k in allowed}, style=style))
+        text_field = TextField(**{k: v for k, v in data.items() if k in allowed}, style=style)
+        if text_field.is_variable():
+            if not text_field.variable_name:
+                text_field.variable_name = _legacy_variable(text_field.template) or text_field.name
+            if not text_field.source_column:
+                text_field.source_column = text_field.variable_key()
+            text_field.sync_variable_template()
+        fields.append(text_field)
+
+    if legacy_numbering.enabled:
+        for text_field in fields:
+            if text_field.is_variable() and text_field.variable_key() == legacy_numbering.field_name:
+                text_field.production_source = "numbering"
+                text_field.number_start = legacy_numbering.start
+                text_field.number_count = legacy_numbering.count
+                text_field.number_step = legacy_numbering.step
+                text_field.number_digits = legacy_numbering.digits
+                text_field.number_prefix = legacy_numbering.prefix
+                text_field.number_suffix = legacy_numbering.suffix
+                break
 
     image_width = int(raw.get("image_width", 0) or 0)
     image_height = int(raw.get("image_height", 0) or 0)
     document_raw = dict(raw.get("document", {}) or {})
     if not document_raw:
         document_raw = {
-            "width": image_width or 1080,
-            "height": image_height or 1080,
+            "width": image_width or 2480,
+            "height": image_height or 3508,
             "background_color": "#ffffff",
             "transparent": False,
-            "preset": "legacy-image" if raw.get("image_path") else "custom",
+            "preset": "legacy-image" if raw.get("image_path") else "a4",
         }
     document = DocumentSettings(**{k: v for k, v in document_raw.items() if k in DocumentSettings.__dataclass_fields__})
 

@@ -16,10 +16,11 @@ from app.core.document_renderer import render_document
 from app.core.imposition import build_imposed_pages, render_imposed_page
 from app.core.models import (
     DocumentSettings, ExportSettings, FieldStyle, FillMode, ImageElement,
-    NumberingSettings, OrderMode, PageSize, ShapeElement, TemplateProject, TextField,
+    OrderMode, PageSize, ShapeElement, TemplateProject, TextField,
 )
+from app.core.production import build_production_rows
 from app.ui.new_document_dialog import DocumentChoice
-from app.ui.studio_main_window import StudioMainWindow
+from app.ui.refined_studio_main_window import RefinedStudioMainWindow
 
 
 def _not_blank(path: Path) -> bool:
@@ -47,13 +48,25 @@ def main() -> None:
     ))
     project.image_width = 720
     project.image_height = 960
-    fields = [
-        TextField(
-            id="headline", name="Título", template="Ideas que\nse imprimen", x=75, y=85,
-            width=570, height=190, z_index=20,
-            style=FieldStyle(font_size=76, min_font_size=28, color="#2563eb", bold=True),
-        )
-    ]
+    static_title = TextField(
+        id="headline", name="Título fijo", template="Ideas que\nse imprimen", text_mode="static",
+        x=75, y=85, width=570, height=190, z_index=20,
+        style=FieldStyle(font_size=76, min_font_size=28, color="#2563eb", bold=True),
+    )
+    variable_name = TextField(
+        id="guest", name="Nombre invitado", template="{{invitado}}", text_mode="variable",
+        variable_name="invitado", production_source="column", source_column="cliente",
+        x=125, y=825, width=470, height=70, z_index=22,
+        style=FieldStyle(font_size=42, min_font_size=18, color="#0f172a", bold=True),
+    )
+    variable_ticket = TextField(
+        id="ticket", name="Número", template="{{ticket}}", text_mode="variable",
+        variable_name="ticket", production_source="numbering", number_start=1,
+        number_count=6, number_digits=3, number_prefix="#",
+        x=500, y=20, width=160, height=70, z_index=24,
+        style=FieldStyle(font_size=36, min_font_size=16, color="#475569", bold=True),
+    )
+    fields = [static_title, variable_name, variable_ticket]
     elements = [
         ImageElement(id="photo", name="Foto", path=str(overlay_path), x=80, y=330,
                      width=560, height=300, fit_mode="cover", crop_left=0.08,
@@ -66,26 +79,27 @@ def main() -> None:
     ]
     project.fields = fields
     project.elements = elements
-    project.data = [{"nombre": "Ana Torres", "numero": "001"}, {"nombre": "Luis Ramírez", "numero": "002"}]
+    project.data = [{"cliente": "Ana Torres"}, {"cliente": "Luis Ramírez"}]
 
+    production_rows = build_production_rows(fields, project.data)
     base_path = Path(document_base_path(project))
     rendered_path = output / "blank-canvas-document.png"
-    render_document(base_path, fields, {}, elements).convert("RGB").save(rendered_path)
+    render_document(base_path, fields, production_rows[0], elements).convert("RGB").save(rendered_path)
 
     settings = ExportSettings(
         dpi=150, page_size=PageSize.A4_PORTRAIT, use_original_piece_size=False,
         piece_width_mm=70, piece_height_mm=93, margin_left_mm=8, margin_top_mm=8,
         margin_right_mm=8, margin_bottom_mm=8, gap_x_mm=3, gap_y_mm=3,
         fill_mode=FillMode.GRID, order_mode=OrderMode.NORMAL,
-        numbering=NumberingSettings(enabled=True, start=1, count=6, digits=3),
+        filename_pattern="{{numero}}_{{invitado}}",
     )
     project.export = settings
-    layout, pages, _ = build_imposed_pages(base_path, project.data, settings)
+    layout, pages, _ = build_imposed_pages(base_path, production_rows, settings)
     imposed = output / "production-sheet.png"
     render_imposed_page(base_path, fields, layout, pages[0], elements).convert("RGB").save(imposed)
 
     app = QApplication.instance() or QApplication([])
-    window = StudioMainWindow()
+    window = RefinedStudioMainWindow()
     window.resize(1600, 920)
     window.show()
     app.processEvents()
@@ -126,8 +140,9 @@ def main() -> None:
         "artifacts": {path.name: path.stat().st_size for path in required},
         "layout": {"columns": layout.columns, "rows": layout.rows, "slots": layout.slots_per_page},
         "features_shown": [
-            "welcome_empty_state", "blank_canvas", "design_mode", "production_mode",
-            "contextual_properties", "layers", "text", "image", "shape", "imposition",
+            "welcome_empty_state", "blank_canvas", "design_mode", "icon_toolbars",
+            "static_text", "variable_text", "production_field_mapping", "list_source",
+            "numbering_source", "filename_generation", "row_management", "imposition",
         ],
     }
     (output / "visual-manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")

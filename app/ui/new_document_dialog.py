@@ -20,13 +20,13 @@ class DocumentChoice:
 
 
 PRESETS = {
-    "Ticket · 7 × 3 cm": (827, 354, "ticket"),
+    "A4 · 300 dpi": (2480, 3508, "a4"),
     "Flyer · A5": (1748, 2480, "a5"),
+    "Ticket · 7 × 3 cm": (827, 354, "ticket"),
     "Sticker · 5 × 5 cm": (591, 591, "sticker"),
     "Tarjeta · 9 × 5 cm": (1063, 591, "card"),
     "Post cuadrado · 1080 px": (1080, 1080, "social-square"),
-    "A4 · 300 dpi": (2480, 3508, "a4"),
-    "Personalizado": (1080, 1080, "custom"),
+    "Personalizado": (2480, 3508, "custom"),
 }
 
 
@@ -40,7 +40,7 @@ class NewDocumentDialog(QDialog):
         root = QVBoxLayout(self)
         title = QLabel("Crear lienzo en blanco")
         title.setStyleSheet("font-size: 20px; font-weight: 700;")
-        subtitle = QLabel("El lienzo es independiente de una imagen. Puedes agregar un fondo después.")
+        subtitle = QLabel("A4 es el formato predeterminado. Puedes elegir otro tamaño o agregar una imagen de fondo después.")
         subtitle.setWordWrap(True)
         subtitle.setStyleSheet("color: #64748b;")
         root.addWidget(title)
@@ -52,7 +52,7 @@ class NewDocumentDialog(QDialog):
             self.preset.addItem(label)
         self.width = QSpinBox(); self.width.setRange(32, 30000)
         self.height = QSpinBox(); self.height.setRange(32, 30000)
-        self.width.setValue(1080); self.height.setValue(1080)
+        self.width.setValue(2480); self.height.setValue(3508)
         self.transparent = QCheckBox("Fondo transparente")
         self.color_button = QPushButton("#ffffff")
         self.color_button.clicked.connect(self._choose_color)
@@ -63,7 +63,7 @@ class NewDocumentDialog(QDialog):
         form.addRow("", self.transparent)
         root.addLayout(form)
 
-        hint = QLabel("Consejo: para impresión puedes definir el tamaño de hoja y la imposición después, en Producción.")
+        hint = QLabel("A4 a 300 dpi = 2480 × 3508 px. Para impresión puedes configurar imposición y hoja en Producción.")
         hint.setWordWrap(True)
         hint.setStyleSheet("padding: 10px; background: #f8fafc; border-radius: 8px; color: #475569;")
         root.addWidget(hint)
