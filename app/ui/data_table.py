@@ -35,9 +35,12 @@ class DataTableWidget(QTableWidget):
         if self.columnCount() == 0:
             self.setColumnCount(1)
             self.setHorizontalHeaderLabels(["nombre"])
-        self.insertRow(self.rowCount())
-        self.setCurrentCell(self.rowCount() - 1, 0)
-        self.editItem(self.item(self.rowCount() - 1, 0)) if self.item(self.rowCount() - 1, 0) else None
+        row = self.rowCount()
+        self.insertRow(row)
+        for column in range(self.columnCount()):
+            self.setItem(row, column, QTableWidgetItem(""))
+        self.setCurrentCell(row, 0)
+        self.editItem(self.item(row, 0))
 
     def delete_selected_rows(self) -> int:
         rows = sorted({index.row() for index in self.selectedIndexes()}, reverse=True)
