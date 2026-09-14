@@ -83,7 +83,7 @@ def main() -> None:
 
     app = QApplication.instance() or QApplication([])
     window = ProMainWindow()
-    window.resize(1500, 900)
+    window.resize(1600, 920)
     window.project.image_path = str(base_path)
     window.project.image_width = 720
     window.project.image_height = 360
@@ -94,6 +94,7 @@ def main() -> None:
     window.canvas.load_image(str(base_path))
     window.canvas.set_document(fields, elements)
     window.data_table.set_rows([row])
+    window._update_layout_info()
     window.canvas.select_id("photo")
     window.show()
     app.processEvents()
@@ -114,7 +115,10 @@ def main() -> None:
         "artifacts": {path.name: path.stat().st_size for path in required},
         "layout": {"columns": layout.columns, "rows": layout.rows, "slots": layout.slots_per_page},
         "page_order": mapping,
-        "features_shown": ["text", "image", "crop", "shape", "rotation", "layers", "selection_handles"],
+        "features_shown": [
+            "text", "image", "crop", "shape", "rotation", "layers",
+            "selection_handles", "graphic_properties",
+        ],
     }
     (output / "visual-manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     (output / "page-order.json").write_text(json.dumps(mapping, indent=2), encoding="utf-8")
