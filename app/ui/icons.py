@@ -18,6 +18,10 @@ def studio_icon(name: str, size: int = 24, color: str = "#334155") -> QIcon:
         painter.drawLine(QPointF(s*.22, s*.22), QPointF(s*.78, s*.22))
         painter.drawLine(QPointF(s*.5, s*.22), QPointF(s*.5, s*.8))
         painter.drawLine(QPointF(s*.34, s*.8), QPointF(s*.66, s*.8))
+    elif name == "variable":
+        path = QPainterPath(QPointF(s*.38, s*.2)); path.cubicTo(s*.25,s*.2,s*.28,s*.38,s*.18,s*.42); path.cubicTo(s*.28,s*.46,s*.25,s*.8,s*.38,s*.8); painter.drawPath(path)
+        path = QPainterPath(QPointF(s*.62, s*.2)); path.cubicTo(s*.75,s*.2,s*.72,s*.38,s*.82,s*.42); path.cubicTo(s*.72,s*.46,s*.75,s*.8,s*.62,s*.8); painter.drawPath(path)
+        painter.drawLine(QPointF(s*.44,s*.36), QPointF(s*.56,s*.36)); painter.drawLine(QPointF(s*.44,s*.5), QPointF(s*.56,s*.5)); painter.drawLine(QPointF(s*.44,s*.64), QPointF(s*.56,s*.64))
     elif name == "image":
         painter.drawRoundedRect(QRectF(s*.16, s*.2, s*.68, s*.58), s*.08, s*.08)
         painter.drawEllipse(QPointF(s*.36, s*.38), s*.07, s*.07)
