@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import re
+
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QColor, QFontDatabase
 from PySide6.QtWidgets import (
     QCheckBox, QColorDialog, QComboBox, QDoubleSpinBox, QFormLayout, QGroupBox,
-    QHBoxLayout, QLabel, QPushButton, QSpinBox, QTextEdit, QVBoxLayout, QWidget,
+    QHBoxLayout, QLabel, QLineEdit, QPushButton, QSpinBox, QTextEdit, QVBoxLayout, QWidget,
 )
 
 from app.core.models import TextField
@@ -25,6 +27,21 @@ class StudioTextPropertiesPanel(QWidget):
         title = QLabel("Texto seleccionado")
         title.setStyleSheet("font-size: 17px; font-weight: 700;")
         root.addWidget(title)
+
+        type_box = QGroupBox("Tipo de texto")
+        type_form = QFormLayout(type_box)
+        self.text_mode = QComboBox()
+        self.text_mode.addItem("Texto fijo · siempre muestra lo mismo", "static")
+        self.text_mode.addItem("Campo variable · cambia en Producción", "variable")
+        self.variable_name = QLineEdit()
+        self.variable_name.setPlaceholderText("Ej.: nombre, numero_mesa, codigo")
+        self.mode_help = QLabel()
+        self.mode_help.setWordWrap(True)
+        self.mode_help.setStyleSheet("color:#64748b;")
+        type_form.addRow("Uso", self.text_mode)
+        type_form.addRow("Nombre del campo", self.variable_name)
+        type_form.addRow("", self.mode_help)
+        root.addWidget(type_box)
 
         content_box = QGroupBox("Contenido")
         content_layout = QVBoxLayout(content_box)
@@ -67,6 +84,8 @@ class StudioTextPropertiesPanel(QWidget):
         root.addWidget(advanced)
         root.addStretch()
 
+        self.text_mode.currentIndexChanged.connect(self._mode_changed)
+        self.variable_name.textChanged.connect(self._apply)
         self.template.textChanged.connect(self._apply)
         self.font_family.currentTextChanged.connect(self._apply)
         self.font_size.valueChanged.connect(self._apply)
@@ -82,7 +101,10 @@ class StudioTextPropertiesPanel(QWidget):
         if not field:
             return
         self._syncing = True
-        self.template.setPlainText(field.template)
+        index = self.text_mode.findData(field.text_mode)
+        self.text_mode.setCurrentIndex(max(0, index))
+        self.variable_name.setText(field.variable_name or field.variable_key())
+        self.template.setPlainText(field.template if not field.is_variable() else "")
         self.font_family.setCurrentText(field.style.font_family)
         self.font_size.setValue(field.style.font_size)
         self.bold.setChecked(field.style.bold)
@@ -94,6 +116,48 @@ class StudioTextPropertiesPanel(QWidget):
         self.rotation.setValue(field.style.rotation)
         self._update_color_button(field.style.color)
         self._syncing = False
+        self._update_mode_ui()
+
+    def _mode_changed(self, *_args) -> None:
+        if self._syncing or not self.field:
+            return
+        new_mode = str(self.text_mode.currentData())
+        if new_mode == "variable":
+            self.field.text_mode = "variable"
+            if not self.variable_name.text().strip():
+                self._syncing = True
+                self.variable_name.setText(self._safe_key(self.field.name if self.field.name != "Texto fijo" else "campo"))
+                self._syncing = False
+            self.field.variable_name = self._safe_key(self.variable_name.text())
+            self.field.name = self.field.name if self.field.name != "Texto fijo" else "Campo variable"
+            self.field.source_column = self.field.source_column or self.field.variable_key()
+            self.field.sync_variable_template()
+        else:
+            self.field.text_mode = "static"
+            if self.field.template.startswith("{{") and self.field.template.endswith("}}"):
+                self.field.template = "Escribe aquí"
+            self._syncing = True
+            self.template.setPlainText(self.field.template)
+            self._syncing = False
+        self._update_mode_ui()
+        self.changed.emit()
+
+    def _update_mode_ui(self) -> None:
+        variable = bool(self.field and self.field.is_variable())
+        self.variable_name.setVisible(variable)
+        label = self.variable_name.parentWidget()
+        self.template.setEnabled(not variable)
+        if variable:
+            self.mode_help.setText("En Producción podrás elegir si este campo se llena desde una columna/lista o con numeración automática.")
+            self.template.setPlaceholderText("El contenido se asigna en Producción")
+        else:
+            self.mode_help.setText("Este texto se imprimirá exactamente igual en todas las salidas.")
+            self.template.setPlaceholderText("Escribe el texto fijo")
+
+    @staticmethod
+    def _safe_key(value: str) -> str:
+        key = re.sub(r"[^a-zA-Z0-9_]+", "_", value.strip()).strip("_").lower()
+        return key or "campo"
 
     def _pick_color(self) -> None:
         if not self.field:
@@ -112,7 +176,12 @@ class StudioTextPropertiesPanel(QWidget):
         if self._syncing or not self.field:
             return
         field = self.field
-        field.template = self.template.toPlainText()
+        if field.is_variable():
+            field.variable_name = self._safe_key(self.variable_name.text())
+            field.source_column = field.source_column or field.variable_key()
+            field.sync_variable_template()
+        else:
+            field.template = self.template.toPlainText()
         field.style.font_family = self.font_family.currentText().strip() or "Arial"
         field.style.font_size = self.font_size.value()
         field.style.bold = self.bold.isChecked()
@@ -121,4 +190,5 @@ class StudioTextPropertiesPanel(QWidget):
         field.x = self.x.value(); field.y = self.y.value(); field.width = self.w.value(); field.height = self.h.value()
         field.opacity = self.opacity.value() / 100.0
         field.style.rotation = self.rotation.value()
+        self._update_mode_ui()
         self.changed.emit()
