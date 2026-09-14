@@ -242,7 +242,8 @@ def project_from_dict(raw: dict[str, Any]) -> TemplateProject:
         export_raw["fill_mode"] = FillMode(export_raw["fill_mode"])
     if "order_mode" in export_raw:
         export_raw["order_mode"] = OrderMode(export_raw["order_mode"])
-    export_raw["numbering"] = NumberingSettings(**dict(export_raw.get("numbering", {}) or {}))
+    legacy_numbering = NumberingSettings(**dict(export_raw.get("numbering", {}) or {}))
+    export_raw["numbering"] = legacy_numbering
 
     fields: list[TextField] = []
     for item in raw.get("fields", []) or []:
@@ -268,6 +269,18 @@ def project_from_dict(raw: dict[str, Any]) -> TemplateProject:
                 text_field.source_column = text_field.variable_key()
             text_field.sync_variable_template()
         fields.append(text_field)
+
+    if legacy_numbering.enabled:
+        for text_field in fields:
+            if text_field.is_variable() and text_field.variable_key() == legacy_numbering.field_name:
+                text_field.production_source = "numbering"
+                text_field.number_start = legacy_numbering.start
+                text_field.number_count = legacy_numbering.count
+                text_field.number_step = legacy_numbering.step
+                text_field.number_digits = legacy_numbering.digits
+                text_field.number_prefix = legacy_numbering.prefix
+                text_field.number_suffix = legacy_numbering.suffix
+                break
 
     image_width = int(raw.get("image_width", 0) or 0)
     image_height = int(raw.get("image_height", 0) or 0)
