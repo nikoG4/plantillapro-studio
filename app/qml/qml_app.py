@@ -19,33 +19,37 @@ def resource_path(relative: str) -> Path:
     return Path(__file__).resolve().parents[2] / relative
 
 
+def qml_entrypoint() -> Path:
+    """Return the modern shell, with an opt-in fallback to the first QML shell."""
+    if os.environ.get("PLANTILLAPRO_QML_LEGACY") == "1":
+        return resource_path("app/qml/Main.qml")
+    return resource_path("app/qml/PolishedMain.qml")
+
+
 def _load_qml_source(path: Path) -> bytes:
-    """Load the QML shell with small compatibility/layout normalizations."""
     source = path.read_text(encoding="utf-8")
+    if path.name == "PolishedMain.qml":
+        # QML object children do not use JavaScript-style semicolon separators. The
+        # polished shell deliberately keeps many tiny controls compact on one line;
+        # normalize `}; NextType {` / `}; onSignal:` forms before parsing.
+        source = source.replace("};", "}")
 
-    # ColumnLayout does not expose padding on the Qt versions used by CI/Windows.
-    source = source.replace(
-        "width: parent.width\n                                spacing: 14\n                                leftPadding: 16; rightPadding: 16; topPadding: 16; bottomPadding: 20",
-        "x: 16\n                                width: Math.max(0, parent.width - 32)\n                                spacing: 14",
-    )
-    source = source.replace(
-        "width: parent.width\n                            spacing: 10\n                            leftPadding: 2; rightPadding: 8; topPadding: 4; bottomPadding: 10",
-        "x: 2\n                            width: Math.max(0, parent.width - 10)\n                            spacing: 10",
-    )
-
-    # Repeater children are inserted into the mapping ColumnLayout. Give the cards an
-    # explicit width so ScrollView implicit sizing cannot collapse them to their content.
-    source = source.replace(
-        "delegate: Card {\n                                    required property var modelData\n                                    Layout.fillWidth: true",
-        "delegate: Card {\n                                    required property var modelData\n                                    width: Math.max(520, parent ? parent.width : 800)\n                                    Layout.fillWidth: true",
-    )
-
-    # The document is independent from a background image, but when one exists QML must
-    # display the same base that the Pillow/PDF renderers use.
-    artboard_marker = '''                    Rectangle {\n                        anchors.fill: parent\n                        color: studio.documentTransparent ? "#ffffff" : studio.documentBackground\n                        radius: 2\n                        border.color: "#d9dee8"\n                        layer.enabled: true\n                    }'''
-    artboard_with_background = artboard_marker + '''\n\n                    Image {\n                        anchors.fill: parent\n                        source: studio.backgroundSource\n                        visible: source.toString().length > 0\n                        fillMode: Image.Stretch\n                        asynchronous: true\n                        cache: true\n                    }'''
-    source = source.replace(artboard_marker, artboard_with_background)
-
+        # When at least one variable is driven by a data list, those rows determine
+        # the copy count. Keep the 4-column numbering grid aligned, but make the count
+        # read-only and explicitly show that it comes from the list.
+        list_drives_count = "studio.dataRowCount > 0 && studio.variableMappings.some(function(entry) { return entry.source === 'column' })"
+        source = source.replace(
+            'Text{text:"Cantidad";color:root.muted;font.pixelSize:10}',
+            f'Text{{text:({list_drives_count}) ? "Copias (por lista)" : "Cantidad";color:root.muted;font.pixelSize:10}}',
+        )
+        source = source.replace(
+            'FieldBox{text:String(modelData.count);Layout.fillWidth:true;onEditingFinished:studio.setNumberSetting(modelData.id,"count",text)}',
+            f'FieldBox{{text:String(({list_drives_count}) ? studio.dataRowCount : modelData.count);enabled:!({list_drives_count});Layout.fillWidth:true;onEditingFinished:studio.setNumberSetting(modelData.id,"count",text)}}',
+        )
+        source = source.replace(
+            'ComboBox { model:["Lista / columna","Numeración automática"];',
+            'ComboBox { Layout.preferredWidth: 190; model:["Lista / columna","Numeración automática"];',
+        )
     return source.encode("utf-8")
 
 
@@ -57,6 +61,6 @@ def create_qml_engine() -> tuple[QQmlApplicationEngine, ModernStudioBridge]:
     engine = QQmlApplicationEngine()
     bridge = ModernStudioBridge()
     engine.rootContext().setContextProperty("studio", bridge)
-    qml_path = resource_path("app/qml/Main.qml")
+    qml_path = qml_entrypoint()
     engine.loadData(_load_qml_source(qml_path), QUrl.fromLocalFile(str(qml_path.parent) + "/"))
     return engine, bridge
