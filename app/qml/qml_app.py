@@ -6,6 +6,8 @@ from pathlib import Path
 
 from PySide6.QtCore import QUrl
 from PySide6.QtQml import QQmlApplicationEngine
+# Imported explicitly so PyInstaller's Qt hooks collect the Quick/Controls runtime.
+from PySide6 import QtQuick, QtQuickControls2  # noqa: F401
 
 from .studio_bridge import StudioBridge
 
