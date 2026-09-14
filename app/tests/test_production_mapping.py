@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from PIL import Image
 from PySide6.QtWidgets import QApplication
 
 from app.core.models import TemplateProject, TextField, project_from_dict, project_to_dict
 from app.core.production import build_production_rows, production_errors, suggested_filename_pattern
+from app.core.renderer import render_template
 from app.ui.data_table import DataTableWidget
 from app.ui.new_document_dialog import NewDocumentDialog
 
@@ -45,6 +47,17 @@ def test_static_and_variable_fields_round_trip_and_legacy_upgrade() -> None:
     legacy = project_from_dict({"fields": [{"id": "old", "name": "nombre", "template": "{{nombre}}", "style": {}}]})
     assert legacy.fields[0].text_mode == "variable"
     assert legacy.fields[0].variable_name == "nombre"
+
+
+def test_static_text_does_not_interpret_variable_syntax(tmp_path) -> None:
+    base = tmp_path / "base.png"
+    Image.new("RGB", (300, 120), "white").save(base)
+    static = TextField(id="s", template="Código {{nombre}}", text_mode="static", x=0, y=0, width=300, height=120)
+    variable = TextField(id="v", template="{{nombre}}", text_mode="variable", variable_name="nombre", x=0, y=0, width=300, height=120)
+    # Both paths must render without changing the semantic mode; direct template helper remains available for filenames.
+    assert render_template(base, [static], {"nombre": "Ana"}).size == (300, 120)
+    assert static.template == "Código {{nombre}}"
+    assert render_template(base, [variable], {"nombre": "Ana"}).size == (300, 120)
 
 
 def test_legacy_global_numbering_becomes_field_numbering() -> None:
