@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import uuid
+
 from PySide6.QtCore import QRect, Qt
 from PySide6.QtGui import QColor, QPainter, QPixmap
 
+from app.core.models import TextField
 from app.ui.enhanced_canvas_widget import EnhancedCanvasWidget
 
 
@@ -28,6 +31,37 @@ class StudioCanvasWidget(EnhancedCanvasWidget):
     def load_image(self, path: str) -> None:
         self.document_transparent = False
         super().load_image(path)
+
+    def add_field(self) -> TextField:
+        self._checkpoint()
+        field = TextField(
+            id=str(uuid.uuid4()), name="Texto fijo", template="Escribe aquí",
+            x=40, y=40, width=420, height=120, z_index=self._next_z(),
+            text_mode="static",
+        )
+        self.fields.append(field)
+        self._select_only(field.id)
+        self.fieldsChanged.emit()
+        return field
+
+    def add_variable_field(self) -> TextField:
+        self._checkpoint()
+        existing = {field.variable_key() for field in self.fields if field.is_variable()}
+        base = "campo"
+        key = base
+        counter = 2
+        while key in existing:
+            key = f"{base}_{counter}"
+            counter += 1
+        field = TextField(
+            id=str(uuid.uuid4()), name="Campo variable", template="{{" + key + "}}",
+            x=60, y=80, width=420, height=120, z_index=self._next_z(),
+            text_mode="variable", variable_name=key, source_column=key,
+        )
+        self.fields.append(field)
+        self._select_only(field.id)
+        self.fieldsChanged.emit()
+        return field
 
     def set_background_style(self, color: str, transparent: bool) -> None:
         self.document_background_color = color or "#ffffff"
