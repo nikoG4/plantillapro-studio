@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import QTableWidget, QTableWidgetItem
 
 
@@ -34,8 +36,20 @@ class DataTableWidget(QTableWidget):
             self.setColumnCount(1)
             self.setHorizontalHeaderLabels(["nombre"])
         self.insertRow(self.rowCount())
+        self.setCurrentCell(self.rowCount() - 1, 0)
+        self.editItem(self.item(self.rowCount() - 1, 0)) if self.item(self.rowCount() - 1, 0) else None
 
-    def delete_selected_rows(self) -> None:
-        for row in sorted({index.row() for index in self.selectedIndexes()}, reverse=True):
+    def delete_selected_rows(self) -> int:
+        rows = sorted({index.row() for index in self.selectedIndexes()}, reverse=True)
+        if not rows and self.currentRow() >= 0:
+            rows = [self.currentRow()]
+        for row in rows:
             self.removeRow(row)
+        return len(rows)
 
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        if event.key() in {Qt.Key.Key_Delete, Qt.Key.Key_Backspace} and self.selectedIndexes():
+            self.delete_selected_rows()
+            event.accept()
+            return
+        super().keyPressEvent(event)
