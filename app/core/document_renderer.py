@@ -33,7 +33,13 @@ def render_document(
         if not getattr(item, "visible", True):
             continue
         if isinstance(item, TextField):
-            _draw_field(image, item, row)
+            layer = Image.new("RGBA", image.size, (0, 0, 0, 0))
+            _draw_field(layer, item, row)
+            opacity = max(0.0, min(1.0, float(item.opacity)))
+            if opacity < 0.999:
+                alpha = layer.getchannel("A").point(lambda value: int(value * opacity))
+                layer.putalpha(alpha)
+            image.alpha_composite(layer)
         else:
             image = render_graphics(image, [item])
     return image
