@@ -3,16 +3,17 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QColor
+from PySide6.QtGui import QAction, QColor, QKeySequence
 from PySide6.QtWidgets import (
-    QApplication, QColorDialog, QDockWidget, QFileDialog, QInputDialog,
+    QApplication, QColorDialog, QDialog, QDockWidget, QFileDialog, QInputDialog,
     QListWidget, QListWidgetItem, QMessageBox, QProgressDialog, QSplitter,
 )
 
 from app.core.image_exporter import export_images
 from app.core.models import ImageElement, ShapeElement, TextField
 from app.core.pdf_exporter import export_pdf
-from app.ui.advanced_canvas_widget import AdvancedCanvasWidget
+from app.ui.crop_dialog import CropDialog
+from app.ui.enhanced_canvas_widget import EnhancedCanvasWidget
 from app.ui.main_window import MainWindow
 from app.ui.preview_dialog import PreviewDialog
 
@@ -24,13 +25,14 @@ class AdvancedMainWindow(MainWindow):
         self._install_advanced_canvas()
         self._install_layers()
         self._install_editor_actions()
+        self._install_editor_menu()
         self.canvas.set_document(self.project.fields, self.project.elements)
         self._refresh_layers()
 
     def _install_advanced_canvas(self) -> None:
         old_canvas = self.canvas
         parent = old_canvas.parentWidget()
-        canvas = AdvancedCanvasWidget()
+        canvas = EnhancedCanvasWidget()
         if isinstance(parent, QSplitter):
             index = parent.indexOf(old_canvas)
             parent.replaceWidget(index, canvas)
@@ -52,28 +54,56 @@ class AdvancedMainWindow(MainWindow):
         dock.setWidget(self.layers)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
 
+    def _action(self, text: str, slot, shortcut: str | None = None) -> QAction:
+        action = QAction(text, self)
+        action.triggered.connect(slot)
+        if shortcut:
+            action.setShortcut(QKeySequence(shortcut))
+        return action
+
     def _install_editor_actions(self) -> None:
         self.toolbar.addSeparator()
         actions = [
-            ("Imagen +", self.add_graphic_image),
-            ("Rectángulo +", lambda: self.canvas.add_shape("rectangle")),
-            ("Elipse +", lambda: self.canvas.add_shape("ellipse")),
-            ("Deshacer", self.canvas.undo),
-            ("Rehacer", self.canvas.redo),
-            ("Frente", self.canvas.bring_to_front),
-            ("Fondo", self.canvas.send_to_back),
-            ("Bloquear", self.canvas.toggle_lock),
-            ("Visible", self.canvas.toggle_visibility),
-            ("Rotar", self.rotate_selected),
-            ("Opacidad", self.change_opacity),
-            ("Color", self.change_shape_color),
-            ("Ajuste imagen", self.change_image_fit),
-            ("Ajustar vista", self.canvas.fit_to_view),
+            self._action("Imagen +", self.add_graphic_image),
+            self._action("Rectángulo +", lambda: self.canvas.add_shape("rectangle")),
+            self._action("Elipse +", lambda: self.canvas.add_shape("ellipse")),
+            self._action("Deshacer", self.canvas.undo, "Ctrl+Z"),
+            self._action("Rehacer", self.canvas.redo, "Ctrl+Y"),
+            self._action("Agrupar", self.canvas.group_selected, "Ctrl+G"),
+            self._action("Desagrupar", self.canvas.ungroup_selected, "Ctrl+Shift+G"),
+            self._action("Recortar", self.crop_selected_image),
+            self._action("Frente", self.canvas.bring_to_front),
+            self._action("Fondo", self.canvas.send_to_back),
+            self._action("Bloquear", self.canvas.toggle_lock),
+            self._action("Visible", self.canvas.toggle_visibility),
+            self._action("Opacidad", self.change_opacity),
+            self._action("Color", self.change_shape_color),
+            self._action("Ajustar vista", self.canvas.fit_to_view),
         ]
-        for text, slot in actions:
-            action = QAction(text, self)
-            action.triggered.connect(slot)
+        for action in actions:
             self.toolbar.addAction(action)
+
+    def _install_editor_menu(self) -> None:
+        edit = self.menuBar().addMenu("Editor")
+        for text, slot in [
+            ("Alinear izquierda", lambda: self.canvas.align_selected("left")),
+            ("Centrar horizontal", lambda: self.canvas.align_selected("hcenter")),
+            ("Alinear derecha", lambda: self.canvas.align_selected("right")),
+            ("Alinear arriba", lambda: self.canvas.align_selected("top")),
+            ("Centrar vertical", lambda: self.canvas.align_selected("vcenter")),
+            ("Alinear abajo", lambda: self.canvas.align_selected("bottom")),
+            ("Distribuir horizontal", lambda: self.canvas.distribute_selected("horizontal")),
+            ("Distribuir vertical", lambda: self.canvas.distribute_selected("vertical")),
+        ]:
+            edit.addAction(self._action(text, slot))
+        edit.addSeparator()
+        edit.addAction(self._action("Agrupar selección", self.canvas.group_selected, "Ctrl+G"))
+        edit.addAction(self._action("Desagrupar selección", self.canvas.ungroup_selected, "Ctrl+Shift+G"))
+        edit.addAction(self._action("Recortar imagen…", self.crop_selected_image))
+        edit.addAction(self._action("Restablecer recorte", self.canvas.reset_crop))
+        edit.addSeparator()
+        edit.addAction(self._action("Rotar por valor…", self.rotate_selected))
+        edit.addAction(self._action("Ajuste de imagen…", self.change_image_fit))
 
     def _on_editor_selection(self, item) -> None:
         self.properties.set_field(item if isinstance(item, TextField) else None)
@@ -96,7 +126,8 @@ class AdvancedMainWindow(MainWindow):
             kind = "T" if isinstance(item, TextField) else "I" if isinstance(item, ImageElement) else "F"
             eye = "👁" if item.visible else "—"
             lock = "🔒" if item.locked else ""
-            row = QListWidgetItem(f"{eye} {lock} [{kind}] {item.name}")
+            group = " ⛓" if getattr(item, "group_id", "") else ""
+            row = QListWidgetItem(f"{eye} {lock} [{kind}] {item.name}{group}")
             row.setData(Qt.ItemDataRole.UserRole, item.id)
             self.layers.addItem(row)
             if item.id == selected:
@@ -108,6 +139,15 @@ class AdvancedMainWindow(MainWindow):
         if path:
             self.canvas.add_image(path)
             self._sync_fields()
+
+    def crop_selected_image(self) -> None:
+        item = self.canvas.selected_element()
+        if not isinstance(item, ImageElement):
+            self.statusBar().showMessage("Selecciona una imagen para recortarla")
+            return
+        dialog = CropDialog(item, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.canvas.crop_selected_image(*dialog.values())
 
     def rotate_selected(self) -> None:
         item = self.canvas.selected_element()
@@ -153,6 +193,12 @@ class AdvancedMainWindow(MainWindow):
         self.project.fields = self.canvas.fields
         self.project.elements = self.canvas.elements
         self._refresh_layers()
+
+    def _table_rows(self) -> list[dict[str, str]]:
+        rows = super()._table_rows()
+        if not rows and not self.project.export.numbering.enabled and (self.project.fields or self.project.elements):
+            return [{}]
+        return rows
 
     def new_project(self) -> None:
         super().new_project()
