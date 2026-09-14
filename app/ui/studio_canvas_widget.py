@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from PySide6.QtCore import QRect, Qt
+from PySide6.QtCore import QRect
 from PySide6.QtGui import QColor, QPainter, QPixmap
 
 from app.core.models import TextField
@@ -62,6 +62,17 @@ class StudioCanvasWidget(EnhancedCanvasWidget):
         self._select_only(field.id)
         self.fieldsChanged.emit()
         return field
+
+    def _paint_item(self, painter: QPainter, item: object) -> None:
+        if isinstance(item, TextField) and item.is_variable():
+            original = item.template
+            item.template = f"Campo: {item.name or item.variable_key()}"
+            try:
+                super()._paint_item(painter, item)
+            finally:
+                item.template = original
+            return
+        super()._paint_item(painter, item)
 
     def set_background_style(self, color: str, transparent: bool) -> None:
         self.document_background_color = color or "#ffffff"
