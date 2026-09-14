@@ -42,12 +42,17 @@ jobs:
         run: python -m compileall -q app scripts main.py
 
       - name: Run functional and unit tests
+        shell: bash
         run: |
+          set -euo pipefail
           mkdir -p artifacts
           python -m pytest -q --junitxml=artifacts/pytest.xml | tee artifacts/pytest-output.txt
 
       - name: Generate UI and render screenshots
-        run: python scripts/visual_validation.py | tee artifacts/visual-validation-output.txt
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/visual_validation.py | tee artifacts/visual-validation-output.txt
 
       - name: Verify visual manifest
         run: |
