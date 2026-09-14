@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import QMessageBox
 
 from app.core.imposition import compute_layout
@@ -11,6 +12,21 @@ from app.ui.advanced_main_window import AdvancedMainWindow
 
 class ProMainWindow(AdvancedMainWindow):
     """Final editor window with validation rules for dynamic and static designs."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._deduplicate_shortcuts()
+
+    def _deduplicate_shortcuts(self) -> None:
+        seen: set[str] = set()
+        for action in self.findChildren(QAction):
+            key = action.shortcut().toString()
+            if not key:
+                continue
+            if key in seen:
+                action.setShortcut(QKeySequence())
+            else:
+                seen.add(key)
 
     def _validate(self, require_output: bool) -> bool:
         self._sync_project()
