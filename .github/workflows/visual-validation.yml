@@ -10,9 +10,11 @@ on:
 permissions:
   contents: read
 
+# Each commit validates independently. GitHub occasionally leaves a cancelled Qt runner
+# in an in-progress state; keying by SHA prevents that stale run from blocking the next head.
 concurrency:
-  group: editor-ci-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: editor-ci-${{ github.event.pull_request.number || github.ref }}-${{ github.sha }}
+  cancel-in-progress: false
 
 jobs:
   tests-and-visuals:
