@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 from typing import Iterable
@@ -19,7 +20,8 @@ def render_template(image_path: str | Path, fields: Iterable[TextField], row: di
 def render_on_image(base: Image.Image, fields: Iterable[TextField], row: dict[str, str]) -> Image.Image:
     image = base.convert("RGBA").copy()
     for field in fields:
-        _draw_field(image, field, row)
+        if getattr(field, "visible", True):
+            _draw_field(image, field, row)
     return image
 
 
@@ -85,12 +87,12 @@ def _draw_field(image: Image.Image, field: TextField, row: dict[str, str]) -> No
 
 
 def load_font(style: FieldStyle, size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
-    candidates = []
+    candidates: list[str] = []
     if style.font_path:
         candidates.append(style.font_path)
-    windir = Path.home().anchor + "Windows/Fonts"
+
     family = style.font_family.lower().replace(" ", "")
-    family_map = {
+    windows_name_map = {
         "arial": "arialbd.ttf" if style.bold else "arial.ttf",
         "calibri": "calibrib.ttf" if style.bold else "calibri.ttf",
         "segoeui": "segoeuib.ttf" if style.bold else "segoeui.ttf",
@@ -100,15 +102,31 @@ def load_font(style: FieldStyle, size: int) -> ImageFont.FreeTypeFont | ImageFon
         "tahoma": "tahomabd.ttf" if style.bold else "tahoma.ttf",
         "georgia": "georgiab.ttf" if style.bold else "georgia.ttf",
         "trebuchetms": "trebucbd.ttf" if style.bold else "trebuc.ttf",
-        "comic sans ms": "comicbd.ttf" if style.bold else "comic.ttf",
         "comicsansms": "comicbd.ttf" if style.bold else "comic.ttf",
     }
-    names = [family_map.get(family, ""), "arialbd.ttf" if style.bold else "arial.ttf", "calibri.ttf", "segoeui.ttf"]
-    candidates.extend(str(Path(windir) / name) for name in names)
+    windows_fonts = Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts"
+    names = [windows_name_map.get(family, ""), "arialbd.ttf" if style.bold else "arial.ttf", "calibri.ttf", "segoeui.ttf"]
+    candidates.extend(str(windows_fonts / name) for name in names if name)
+
+    scalable_fallbacks = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if style.bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf" if style.bold else "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf" if style.bold else "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/System/Library/Fonts/Supplemental/Arial Bold.ttf" if style.bold else "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "/Library/Fonts/Arial Bold.ttf" if style.bold else "/Library/Fonts/Arial.ttf",
+    ]
+    candidates.extend(scalable_fallbacks)
+
     for path in candidates:
         try:
             if path and Path(path).exists():
                 return ImageFont.truetype(path, size=size)
+        except OSError:
+            continue
+
+    for bundled_name in (["DejaVuSans-Bold.ttf", "DejaVuSans.ttf"] if style.bold else ["DejaVuSans.ttf"]):
+        try:
+            return ImageFont.truetype(bundled_name, size=size)
         except OSError:
             continue
     return ImageFont.load_default()

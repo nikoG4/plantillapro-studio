@@ -1,33 +1,136 @@
-name: Tests and visual validation
+name: Editor CI - tests, visuals and Windows build
 
 on:
-  push:
-    branches: [master, "agent/**"]
   pull_request:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: editor-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  validate:
+  tests-and-visuals:
+    name: Linux tests + visual proof
     runs-on: ubuntu-latest
     env:
       QT_QPA_PLATFORM: offscreen
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
+
       - name: Install Qt runtime dependencies
         run: sudo apt-get update -qq && sudo apt-get install -y -qq libegl1 libgl1
-      - run: python -m pip install -q -r requirements.txt
-      - name: Run tests
-        run: python -m pytest -q > pytest-output.txt 2>&1
-      - name: Generate visual validation
-        run: python scripts/visual_validation.py
-      - uses: actions/upload-artifact@v4
+
+      - name: Install dependencies
+        run: python -m pip install -q -r requirements.txt
+
+      - name: Compile Python sources
+        run: python -m compileall -q app scripts main.py
+
+      - name: Run functional and unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          python -m pytest -q --junitxml=artifacts/pytest.xml | tee artifacts/pytest-output.txt
+
+      - name: Generate UI and render screenshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/visual_validation.py | tee artifacts/visual-validation-output.txt
+
+      - name: Verify visual manifest
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          manifest = json.loads(Path('artifacts/visual-manifest.json').read_text(encoding='utf-8'))
+          assert manifest['visual_validation'] == 'passed'
+          assert len(manifest['artifacts']) >= 4
+          assert all(size > 1000 for size in manifest['artifacts'].values())
+          print('Visual manifest OK:', manifest['features_shown'])
+          PY
+
+      - name: Upload visual proof
+        uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: visual-validation
+          name: editor-visual-proof-linux
           path: |
-            pytest-output.txt
-            artifacts/
-          if-no-files-found: warn
+            artifacts/*.png
+            artifacts/*.json
+            artifacts/*.xml
+            artifacts/*.txt
+          if-no-files-found: error
+          retention-days: 14
+
+  windows-build:
+    name: Windows tests + PyInstaller build
+    runs-on: windows-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Compile Python sources
+        run: python -m compileall -q app scripts main.py
+
+      - name: Run tests on Windows
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          python -m pytest -q --junitxml=artifacts/pytest-windows.xml 2>&1 | Tee-Object -FilePath artifacts/pytest-windows.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build Windows application
+        shell: cmd
+        run: build_windows.bat
+
+      - name: Verify compiled application
+        shell: pwsh
+        run: |
+          $exe = Get-Item "dist\PlantillaProStudio\PlantillaProStudio.exe" -ErrorAction Stop
+          if ($exe.Length -lt 1000000) { throw "El ejecutable parece inválido: $($exe.Length) bytes" }
+          "EXE: $($exe.FullName)" | Tee-Object -FilePath artifacts/build-verification.txt
+          "Bytes: $($exe.Length)" | Tee-Object -Append -FilePath artifacts/build-verification.txt
+          Get-FileHash $exe.FullName -Algorithm SHA256 | Format-List | Out-String | Tee-Object -Append -FilePath artifacts/build-verification.txt
+
+      - name: Package Windows validation build
+        shell: pwsh
+        run: Compress-Archive -Path "dist\PlantillaProStudio\*" -DestinationPath "artifacts\PlantillaProStudio-ci-windows-x64.zip" -Force
+
+      - name: Upload Windows build
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: PlantillaProStudio-windows-validation
+          path: |
+            artifacts/PlantillaProStudio-ci-windows-x64.zip
+            artifacts/build-verification.txt
+            artifacts/pytest-windows.xml
+            artifacts/pytest-windows.txt
+          if-no-files-found: error
+          retention-days: 14

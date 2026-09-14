@@ -5,10 +5,21 @@ from typing import Callable, Iterable
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 from .imposition import build_imposed_pages, render_imposed_page
-from .models import ExportSettings, TextField
+from .models import ExportSettings, GraphicElement, TextField
+
 POINTS_PER_INCH = 72
 
-def export_pdf(image_path: str | Path, fields: Iterable[TextField], rows: list[dict[str, str]], settings: ExportSettings, output_path: str | Path, progress: Callable[[int, int], None] | None = None, should_cancel: Callable[[], bool] | None = None) -> int:
+
+def export_pdf(
+    image_path: str | Path,
+    fields: Iterable[TextField],
+    rows: list[dict[str, str]],
+    settings: ExportSettings,
+    output_path: str | Path,
+    progress: Callable[[int, int], None] | None = None,
+    should_cancel: Callable[[], bool] | None = None,
+    elements: Iterable[GraphicElement] | None = None,
+) -> int:
     layout, pages, _ = build_imposed_pages(image_path, rows, settings)
     page_w = layout.page_width / settings.dpi * POINTS_PER_INCH
     page_h = layout.page_height / settings.dpi * POINTS_PER_INCH
@@ -19,7 +30,7 @@ def export_pdf(image_path: str | Path, fields: Iterable[TextField], rows: list[d
     for page_items in pages:
         if should_cancel and should_cancel():
             break
-        rendered = render_imposed_page(image_path, fields, layout, page_items).convert("RGB")
+        rendered = render_imposed_page(image_path, fields, layout, page_items, elements).convert("RGB")
         buffer = BytesIO()
         rendered.save(buffer, format="PNG" if settings.max_quality_pdf else "JPEG", quality=settings.jpeg_quality)
         buffer.seek(0)
