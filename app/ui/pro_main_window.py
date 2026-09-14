@@ -56,8 +56,12 @@ class ProMainWindow(AdvancedMainWindow):
 
     def _validate(self, require_output: bool) -> bool:
         self._sync_project()
-        if not self.project.image_path or not Path(self.project.image_path).exists():
-            QMessageBox.warning(self, "Falta imagen", "Carga una imagen base válida.")
+        width, height = self.project.document_size()
+        if width <= 0 or height <= 0:
+            QMessageBox.warning(self, "Falta lienzo", "Crea un lienzo o carga una imagen de fondo.")
+            return False
+        if self.project.image_path and not Path(self.project.image_path).exists():
+            QMessageBox.warning(self, "Fondo no encontrado", "La imagen de fondo del proyecto ya no existe.")
             return False
         if not self.project.fields and not self.project.elements:
             QMessageBox.warning(self, "Diseño vacío", "Agrega al menos texto, una imagen o una forma.")
@@ -65,8 +69,7 @@ class ProMainWindow(AdvancedMainWindow):
 
         rows = self._table_rows()
         if not rows and not (self.project.export.numbering.enabled and self.project.export.numbering.count > 0):
-            QMessageBox.warning(self, "Faltan datos", "Carga datos, activa numeración o crea un diseño estático.")
-            return False
+            rows = [{}]
 
         columns: set[str] = set()
         for row in rows:
@@ -79,7 +82,7 @@ class ProMainWindow(AdvancedMainWindow):
             return False
 
         try:
-            layout = compute_layout(self.project.export, (self.project.image_width, self.project.image_height))
+            layout = compute_layout(self.project.export, (width, height))
             if layout.slots_per_page <= 0:
                 QMessageBox.warning(self, "La pieza no entra", "Reduce el tamaño de la pieza, los márgenes o las separaciones.")
                 return False

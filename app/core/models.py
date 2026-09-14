@@ -25,6 +25,15 @@ class OrderMode(str, Enum):
 
 
 @dataclass
+class DocumentSettings:
+    width: int = 1080
+    height: int = 1080
+    background_color: str = "#ffffff"
+    transparent: bool = False
+    preset: str = "custom"
+
+
+@dataclass
 class FieldStyle:
     font_path: str = ""
     font_family: str = "Arial"
@@ -79,7 +88,7 @@ class ImageElement:
     locked: bool = False
     visible: bool = True
     z_index: int = 10
-    fit_mode: str = "cover"  # cover | contain | stretch
+    fit_mode: str = "cover"
     flip_horizontal: bool = False
     flip_vertical: bool = False
     crop_left: float = 0.0
@@ -94,7 +103,7 @@ class ImageElement:
 class ShapeElement:
     id: str
     name: str = "forma"
-    shape_type: str = "rectangle"  # rectangle | ellipse
+    shape_type: str = "rectangle"
     x: int = 0
     y: int = 0
     width: int = 300
@@ -160,10 +169,16 @@ class TemplateProject:
     image_path: str = ""
     image_width: int = 0
     image_height: int = 0
+    document: DocumentSettings = field(default_factory=DocumentSettings)
     fields: list[TextField] = field(default_factory=list)
     elements: list[GraphicElement] = field(default_factory=list)
     data: list[dict[str, str]] = field(default_factory=list)
     export: ExportSettings = field(default_factory=ExportSettings)
+
+    def document_size(self) -> tuple[int, int]:
+        width = self.document.width or self.image_width or 1080
+        height = self.document.height or self.image_height or 1080
+        return max(1, int(width)), max(1, int(height))
 
 
 def _enum_to_value(value: Any) -> Any:
@@ -210,11 +225,25 @@ def project_from_dict(raw: dict[str, Any]) -> TemplateProject:
         allowed = set(TextField.__dataclass_fields__) - {"style"}
         fields.append(TextField(**{k: v for k, v in data.items() if k in allowed}, style=style))
 
+    image_width = int(raw.get("image_width", 0) or 0)
+    image_height = int(raw.get("image_height", 0) or 0)
+    document_raw = dict(raw.get("document", {}) or {})
+    if not document_raw:
+        document_raw = {
+            "width": image_width or 1080,
+            "height": image_height or 1080,
+            "background_color": "#ffffff",
+            "transparent": False,
+            "preset": "legacy-image" if raw.get("image_path") else "custom",
+        }
+    document = DocumentSettings(**{k: v for k, v in document_raw.items() if k in DocumentSettings.__dataclass_fields__})
+
     elements = [_graphic_element_from_dict(item) for item in (raw.get("elements", []) or [])]
     return TemplateProject(
         image_path=raw.get("image_path", ""),
-        image_width=int(raw.get("image_width", 0) or 0),
-        image_height=int(raw.get("image_height", 0) or 0),
+        image_width=image_width,
+        image_height=image_height,
+        document=document,
         fields=fields,
         elements=elements,
         data=list(raw.get("data", []) or []),
