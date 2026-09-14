@@ -73,9 +73,9 @@ class TextField:
     visible: bool = True
     z_index: int = 100
     group_id: str = ""
-    text_mode: str = "static"  # static | variable
+    text_mode: str = "static"
     variable_name: str = ""
-    production_source: str = "column"  # column | numbering
+    production_source: str = "column"
     source_column: str = ""
     number_start: int = 1
     number_step: int = 1
@@ -168,7 +168,10 @@ class ExportSettings:
     output_pdf: str = ""
     output_folder: str = ""
     image_format: str = "PNG"
-    filename_pattern: str = "{{numero}}_{{nombre}}"
+    filename_pattern: str = "{{numero}}"
+    filename_mode: str = "number"
+    filename_field_id: str = ""
+    filename_custom: str = ""
     jpeg_quality: int = 95
     max_quality_pdf: bool = True
     use_original_piece_size: bool = True
