@@ -20,6 +20,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       QT_QPA_PLATFORM: offscreen
+      QSG_RHI_BACKEND: software
+      QT_QUICK_BACKEND: software
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -46,22 +48,33 @@ jobs:
           mkdir -p artifacts
           python -m pytest -q --junitxml=artifacts/pytest.xml | tee artifacts/pytest-output.txt
 
-      - name: Generate UI and render screenshots
+      - name: Generate legacy UI and render screenshots
         shell: bash
         run: |
           set -euo pipefail
           python scripts/visual_validation.py | tee artifacts/visual-validation-output.txt
 
-      - name: Verify visual manifest
+      - name: Generate Qt Quick UI screenshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/qml_visual_validation.py | tee artifacts/qml-visual-validation-output.txt
+
+      - name: Verify visual manifests
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
-          manifest = json.loads(Path('artifacts/visual-manifest.json').read_text(encoding='utf-8'))
-          assert manifest['visual_validation'] == 'passed'
-          assert len(manifest['artifacts']) >= 4
-          assert all(size > 1000 for size in manifest['artifacts'].values())
-          print('Visual manifest OK:', manifest['features_shown'])
+          legacy = json.loads(Path('artifacts/visual-manifest.json').read_text(encoding='utf-8'))
+          qml = json.loads(Path('artifacts/qml-visual-manifest.json').read_text(encoding='utf-8'))
+          assert legacy['visual_validation'] == 'passed'
+          assert qml['qml_visual_validation'] == 'passed'
+          assert len(legacy['artifacts']) >= 4
+          assert len(qml['artifacts']) >= 3
+          assert all(size > 1000 for size in legacy['artifacts'].values())
+          assert all(size > 1500 for size in qml['artifacts'].values())
+          print('Legacy visual manifest OK:', legacy['features_shown'])
+          print('QML visual manifest OK:', qml['features_shown'])
           PY
 
       - name: Upload visual proof
@@ -82,6 +95,8 @@ jobs:
     runs-on: windows-latest
     env:
       QT_QPA_PLATFORM: offscreen
+      QSG_RHI_BACKEND: software
+      QT_QUICK_BACKEND: software
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -114,8 +129,10 @@ jobs:
         run: |
           $exe = Get-Item "dist\PlantillaProStudio\PlantillaProStudio.exe" -ErrorAction Stop
           if ($exe.Length -lt 1000000) { throw "El ejecutable parece inválido: $($exe.Length) bytes" }
+          $qml = Get-Item "dist\PlantillaProStudio\_internal\app\qml\Main.qml" -ErrorAction Stop
           "EXE: $($exe.FullName)" | Tee-Object -FilePath artifacts/build-verification.txt
           "Bytes: $($exe.Length)" | Tee-Object -Append -FilePath artifacts/build-verification.txt
+          "QML: $($qml.FullName)" | Tee-Object -Append -FilePath artifacts/build-verification.txt
           Get-FileHash $exe.FullName -Algorithm SHA256 | Format-List | Out-String | Tee-Object -Append -FilePath artifacts/build-verification.txt
 
       - name: Package Windows validation build
