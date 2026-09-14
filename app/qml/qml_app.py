@@ -33,6 +33,23 @@ def _load_qml_source(path: Path) -> bytes:
         # polished shell deliberately keeps many tiny controls compact on one line;
         # normalize `}; NextType {` / `}; onSignal:` forms before parsing.
         source = source.replace("};", "}")
+
+        # Keep production semantics visually honest: when any variable comes from a
+        # list, its rows determine the number of generated copies. In that case the
+        # numbering card must not expose a competing, ineffective count value.
+        list_drives_count = "studio.dataRowCount > 0 && studio.variableMappings.some(function(entry) { return entry.source === 'column' })"
+        source = source.replace(
+            'Text{text:"Cantidad";color:root.muted;font.pixelSize:10}',
+            f'Text{{visible:!({list_drives_count});text:"Cantidad";color:root.muted;font.pixelSize:10}}',
+        )
+        source = source.replace(
+            'FieldBox{text:String(modelData.count);Layout.fillWidth:true;onEditingFinished:studio.setNumberSetting(modelData.id,"count",text)}',
+            f'FieldBox{{visible:!({list_drives_count});text:String(modelData.count);Layout.fillWidth:true;onEditingFinished:studio.setNumberSetting(modelData.id,"count",text)}}',
+        )
+        source = source.replace(
+            'ComboBox { model:["Lista / columna","Numeración automática"];',
+            'ComboBox { Layout.preferredWidth: 190; model:["Lista / columna","Numeración automática"];',
+        )
     return source.encode("utf-8")
 
 
