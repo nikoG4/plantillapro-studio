@@ -45,13 +45,14 @@ def missing_variables(fields: Iterable[TextField], columns: Iterable[str]) -> se
     available = set(columns) | {"numero"}
     required: set[str] = set()
     for field in fields:
-        required |= template_variables(field.template)
+        if field.is_variable():
+            required.add(field.variable_key())
     return required - available
 
 
 def _draw_field(image: Image.Image, field: TextField, row: dict[str, str]) -> None:
     style = field.style
-    text = render_text_template(field.template, row, _safe_num(row))
+    text = render_text_template(field.template, row, _safe_num(row)) if field.is_variable() else field.template
     if style.text_case == "upper" or style.uppercase:
         text = text.upper()
     elif style.text_case == "lower":
