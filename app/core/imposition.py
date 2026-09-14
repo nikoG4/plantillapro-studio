@@ -4,8 +4,8 @@ from math import ceil
 from pathlib import Path
 from typing import Iterable
 from PIL import Image
-from .models import ExportSettings, FillMode, NumberingSettings, OrderMode, PageSize, TextField
-from .renderer import render_template
+from .document_renderer import render_document
+from .models import ExportSettings, FillMode, GraphicElement, NumberingSettings, OrderMode, PageSize, TextField
 
 @dataclass(frozen=True)
 class Placement:
@@ -126,12 +126,12 @@ def build_imposed_pages(image_path: str | Path, rows: list[dict[str, str]], sett
     prepared = prepare_rows(rows, settings)
     return layout, paginate_rows(prepared, layout.slots_per_page, settings.order_mode), prepared
 
-def render_imposed_page(image_path: str | Path, fields: Iterable[TextField], layout: LayoutInfo, page_items: list[dict[str, str] | None]) -> Image.Image:
+def render_imposed_page(image_path: str | Path, fields: Iterable[TextField], layout: LayoutInfo, page_items: list[dict[str, str] | None], elements: Iterable[GraphicElement] | None = None) -> Image.Image:
     page = Image.new("RGBA", (layout.page_width, layout.page_height), "white")
     for placement, item in zip(layout.placements, page_items):
         if item is None:
             continue
-        rendered = render_template(image_path, fields, item)
+        rendered = render_document(image_path, fields, item, elements)
         if rendered.size != (layout.piece_width, layout.piece_height):
             rendered = rendered.resize((layout.piece_width, layout.piece_height), Image.Resampling.LANCZOS)
         page.alpha_composite(rendered.convert("RGBA"), (placement.x, placement.y))
