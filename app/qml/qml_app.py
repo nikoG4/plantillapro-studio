@@ -26,6 +26,16 @@ def qml_entrypoint() -> Path:
     return resource_path("app/qml/PolishedMain.qml")
 
 
+def _load_qml_source(path: Path) -> bytes:
+    source = path.read_text(encoding="utf-8")
+    if path.name == "PolishedMain.qml":
+        # QML object children do not use JavaScript-style semicolon separators. The
+        # polished shell deliberately keeps many tiny controls compact on one line;
+        # normalize `}; NextType {` / `}; onSignal:` forms before parsing.
+        source = source.replace("};", "}")
+    return source.encode("utf-8")
+
+
 def create_qml_engine() -> tuple[QQmlApplicationEngine, ModernStudioBridge]:
     if os.environ.get("QT_QPA_PLATFORM") == "offscreen":
         os.environ.setdefault("QSG_RHI_BACKEND", "software")
@@ -35,5 +45,5 @@ def create_qml_engine() -> tuple[QQmlApplicationEngine, ModernStudioBridge]:
     bridge = ModernStudioBridge()
     engine.rootContext().setContextProperty("studio", bridge)
     qml_path = qml_entrypoint()
-    engine.load(QUrl.fromLocalFile(str(qml_path)))
+    engine.loadData(_load_qml_source(qml_path), QUrl.fromLocalFile(str(qml_path.parent) + "/"))
     return engine, bridge
