@@ -34,17 +34,17 @@ def _load_qml_source(path: Path) -> bytes:
         # normalize `}; NextType {` / `}; onSignal:` forms before parsing.
         source = source.replace("};", "}")
 
-        # Keep production semantics visually honest: when any variable comes from a
-        # list, its rows determine the number of generated copies. In that case the
-        # numbering card must not expose a competing, ineffective count value.
+        # When at least one variable is driven by a data list, those rows determine
+        # the copy count. Keep the 4-column numbering grid aligned, but make the count
+        # read-only and explicitly show that it comes from the list.
         list_drives_count = "studio.dataRowCount > 0 && studio.variableMappings.some(function(entry) { return entry.source === 'column' })"
         source = source.replace(
             'Text{text:"Cantidad";color:root.muted;font.pixelSize:10}',
-            f'Text{{visible:!({list_drives_count});text:"Cantidad";color:root.muted;font.pixelSize:10}}',
+            f'Text{{text:({list_drives_count}) ? "Copias (por lista)" : "Cantidad";color:root.muted;font.pixelSize:10}}',
         )
         source = source.replace(
             'FieldBox{text:String(modelData.count);Layout.fillWidth:true;onEditingFinished:studio.setNumberSetting(modelData.id,"count",text)}',
-            f'FieldBox{{visible:!({list_drives_count});text:String(modelData.count);Layout.fillWidth:true;onEditingFinished:studio.setNumberSetting(modelData.id,"count",text)}}',
+            f'FieldBox{{text:String(({list_drives_count}) ? studio.dataRowCount : modelData.count);enabled:!({list_drives_count});Layout.fillWidth:true;onEditingFinished:studio.setNumberSetting(modelData.id,"count",text)}}',
         )
         source = source.replace(
             'ComboBox { model:["Lista / columna","Numeración automática"];',
