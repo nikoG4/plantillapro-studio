@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
-    QComboBox, QFormLayout, QFrame, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QSpinBox, QVBoxLayout, QWidget,
+    QComboBox, QFormLayout, QGroupBox, QLabel, QLineEdit, QSpinBox, QVBoxLayout, QWidget,
 )
 
 from app.core.models import TextField
-from app.core.production import filename_preview, source_columns, suggested_filename_pattern, variable_fields
+from app.core.production import (
+    build_production_rows, filename_preview, source_columns, suggested_filename_pattern, variable_fields,
+)
 
 
 class ProductionMappingPanel(QWidget):
@@ -33,7 +34,7 @@ class ProductionMappingPanel(QWidget):
         intro.setStyleSheet("color:#64748b; padding:8px 2px;")
         root.addWidget(intro)
 
-        self.empty = QLabel("No hay campos variables. En Diseño cambia un texto a ‘Campo variable’ para usar datos en Producción.")
+        self.empty = QLabel("No hay campos variables. En Diseño agrega un ‘Campo variable’ para usar listas o numeración.")
         self.empty.setWordWrap(True)
         self.empty.setStyleSheet("padding:14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px;")
         root.addWidget(self.empty)
@@ -44,7 +45,7 @@ class ProductionMappingPanel(QWidget):
         self.cards_layout.setSpacing(10)
         root.addWidget(self.cards_host)
 
-        file_box = QGroupBox("Nombre de los archivos")
+        file_box = QGroupBox("Nombre de los archivos generados")
         file_form = QFormLayout(file_box)
         self.filename_mode = QComboBox()
         self.filename_mode.addItem("Número consecutivo · 001.png", "number")
@@ -56,8 +57,8 @@ class ProductionMappingPanel(QWidget):
         self.filename_custom.setPlaceholderText("Ej.: invitacion_{{nombre}}_{{numero}}")
         self.filename_preview = QLabel("Ejemplo: 001.png")
         self.filename_preview.setStyleSheet("color:#475569; font-weight:600;")
-        file_form.addRow("Formato", self.filename_mode)
-        file_form.addRow("Campo", self.filename_field)
+        file_form.addRow("Cómo nombrar", self.filename_mode)
+        file_form.addRow("Campo usado", self.filename_field)
         file_form.addRow("Patrón", self.filename_custom)
         file_form.addRow("", self.filename_preview)
         root.addWidget(file_box)
@@ -68,11 +69,20 @@ class ProductionMappingPanel(QWidget):
         self.filename_custom.textChanged.connect(self._filename_changed)
 
     def set_context(self, fields: list[TextField], rows: list[dict[str, str]], export_settings) -> None:
+        self._syncing = True
         self.fields = fields
         self.rows = rows
         self.export_settings = export_settings
         self._rebuild_cards()
         self._refresh_filename_fields()
+        mode_index = self.filename_mode.findData(export_settings.filename_mode)
+        self.filename_mode.setCurrentIndex(max(0, mode_index))
+        if export_settings.filename_field_id:
+            field_index = self.filename_field.findData(export_settings.filename_field_id)
+            if field_index >= 0:
+                self.filename_field.setCurrentIndex(field_index)
+        self.filename_custom.setText(export_settings.filename_custom)
+        self._syncing = False
         self._filename_changed()
 
     def _rebuild_cards(self) -> None:
@@ -93,8 +103,8 @@ class ProductionMappingPanel(QWidget):
             key = QLabel(field.variable_key())
             key.setStyleSheet("font-family:monospace; color:#2563eb; font-weight:700;")
             source = QComboBox()
-            source.addItem("Tomar valores de una lista / columna", "column")
-            source.addItem("Generar numeración automática", "numbering")
+            source.addItem("Lista / columna de datos", "column")
+            source.addItem("Numeración automática", "numbering")
             column = QComboBox()
             for name in columns:
                 column.addItem(name)
@@ -114,8 +124,8 @@ class ProductionMappingPanel(QWidget):
 
             form.addRow("Identificador", key)
             form.addRow("Rellenar con", source)
-            form.addRow("Columna de datos", column)
-            form.addRow("Inicio", start)
+            form.addRow("Columna", column)
+            form.addRow("Número inicial", start)
             form.addRow("Cantidad", count)
             form.addRow("Incremento", step)
             form.addRow("Dígitos", digits)
@@ -175,32 +185,29 @@ class ProductionMappingPanel(QWidget):
             help_label.setText(f"Ejemplo: {field.number_prefix}{sample}{field.number_suffix}")
         else:
             source_name = field.source_column or "ninguna"
-            help_label.setText(f"Cada salida usará el valor de la columna ‘{source_name}’.")
-        if emit:
+            help_label.setText(f"Cada salida usará la columna ‘{source_name}’.")
+        if emit and not self._syncing:
             self.changed.emit()
             self._filename_changed()
 
     def _refresh_filename_fields(self) -> None:
-        current = self.filename_field.currentData()
-        self.filename_field.blockSignals(True)
         self.filename_field.clear()
         for field in variable_fields(self.fields):
             self.filename_field.addItem(field.name, field.id)
-        if current:
-            index = self.filename_field.findData(current)
-            if index >= 0:
-                self.filename_field.setCurrentIndex(index)
-        self.filename_field.blockSignals(False)
 
     def _filename_changed(self, *_args) -> None:
         if self.export_settings is None:
             return
         mode = str(self.filename_mode.currentData())
         field_id = str(self.filename_field.currentData() or "")
-        pattern = suggested_filename_pattern(self.fields, mode, field_id, self.filename_custom.text())
+        custom = self.filename_custom.text()
+        pattern = suggested_filename_pattern(self.fields, mode, field_id, custom)
+        self.export_settings.filename_mode = mode
+        self.export_settings.filename_field_id = field_id
+        self.export_settings.filename_custom = custom
         self.export_settings.filename_pattern = pattern
-        mapped_rows = self.rows
-        self.filename_field.setEnabled(mode in {"field", "number_field"})
+        mapped_rows = build_production_rows(self.fields, self.rows)
+        self.filename_field.setEnabled(mode in {"field", "number_field"} and self.filename_field.count() > 0)
         self.filename_custom.setEnabled(mode == "custom")
         self.filename_preview.setText(f"Ejemplo: {filename_preview(pattern, mapped_rows)}.png")
         if not self._syncing:
