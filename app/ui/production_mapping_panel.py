@@ -176,17 +176,30 @@ class ProductionMappingPanel(QWidget):
         field.number_suffix = widgets["suffix"].text()  # type: ignore[attr-defined]
 
         numbering = field.production_source == "numbering"
+        list_drives_count = bool(self.rows) and any(
+            candidate.production_source == "column" for candidate in variable_fields(self.fields)
+        )
         column.setEnabled(not numbering)
-        for key in ("start", "count", "step", "digits", "prefix", "suffix"):
+        for key in ("start", "step", "digits", "prefix", "suffix"):
             widgets[key].setEnabled(numbering)
+        widgets["count"].setEnabled(numbering and not list_drives_count)
         help_label: QLabel = widgets["help"]  # type: ignore[assignment]
         if numbering:
             sample = str(field.number_start).zfill(field.number_digits) if field.number_digits else str(field.number_start)
-            help_label.setText(f"Ejemplo: {field.number_prefix}{sample}{field.number_suffix}")
+            example = f"{field.number_prefix}{sample}{field.number_suffix}"
+            if list_drives_count:
+                help_label.setText(
+                    f"Ejemplo: {example}. La lista define la cantidad: {len(self.rows)} copia(s)."
+                )
+            else:
+                help_label.setText(f"Ejemplo: {example}. Aquí la cantidad define cuántas copias se generan.")
         else:
             source_name = field.source_column or "ninguna"
-            help_label.setText(f"Cada salida usará la columna ‘{source_name}’.")
+            help_label.setText(f"Cada fila de la columna ‘{source_name}’ genera una copia.")
         if emit and not self._syncing:
+            for other in variable_fields(self.fields):
+                if other.id != field.id and other.id in self._cards:
+                    self._apply_field(other, emit=False)
             self.changed.emit()
             self._filename_changed()
 
