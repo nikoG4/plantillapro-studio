@@ -35,11 +35,12 @@ class StudioTextPropertiesPanel(QWidget):
         self.text_mode.addItem("Campo variable · cambia en Producción", "variable")
         self.variable_name = QLineEdit()
         self.variable_name.setPlaceholderText("Ej.: nombre, numero_mesa, codigo")
+        self.variable_name_label = QLabel("Nombre del campo")
         self.mode_help = QLabel()
         self.mode_help.setWordWrap(True)
         self.mode_help.setStyleSheet("color:#64748b;")
         type_form.addRow("Uso", self.text_mode)
-        type_form.addRow("Nombre del campo", self.variable_name)
+        type_form.addRow(self.variable_name_label, self.variable_name)
         type_form.addRow("", self.mode_help)
         root.addWidget(type_box)
 
@@ -144,8 +145,8 @@ class StudioTextPropertiesPanel(QWidget):
 
     def _update_mode_ui(self) -> None:
         variable = bool(self.field and self.field.is_variable())
+        self.variable_name_label.setVisible(variable)
         self.variable_name.setVisible(variable)
-        label = self.variable_name.parentWidget()
         self.template.setEnabled(not variable)
         if variable:
             self.mode_help.setText("En Producción podrás elegir si este campo se llena desde una columna/lista o con numeración automática.")
