@@ -23,11 +23,15 @@ def source_columns(rows: Iterable[dict[str, str]]) -> list[str]:
 
 
 def build_production_rows(fields: Iterable[TextField], rows: list[dict[str, str]]) -> list[dict[str, str]]:
-    """Resolve each variable text field from either a data column or a number sequence."""
+    """Resolve each variable field. A mapped data list drives copy count when present."""
     fields = variable_fields(fields)
     data_count = len(rows)
+    has_list_source = any(field.production_source == "column" for field in fields)
     number_count = max((max(1, field.number_count) for field in fields if field.production_source == "numbering"), default=0)
-    count = max(data_count, number_count, 1)
+    if has_list_source and data_count:
+        count = data_count
+    else:
+        count = max(data_count, number_count, 1)
 
     result: list[dict[str, str]] = [deepcopy(rows[index]) if index < data_count else {} for index in range(count)]
     for index, row in enumerate(result):
