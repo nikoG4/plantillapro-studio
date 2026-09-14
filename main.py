@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from app.ui.studio_main_window import StudioMainWindow
+from app.ui.refined_studio_main_window import RefinedStudioMainWindow
 
 
 def main() -> int:
@@ -18,7 +18,7 @@ def main() -> int:
     icon_path = ROOT / "assets" / "plantillapro_logo.ico"
     if icon_path.exists():
         app.setWindowIcon(QIcon(str(icon_path)))
-    window = StudioMainWindow()
+    window = RefinedStudioMainWindow()
     window.show()
     return app.exec()
 
