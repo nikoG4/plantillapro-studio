@@ -17,7 +17,7 @@ from app.core.models import (
     ExportSettings, FieldStyle, FillMode, ImageElement, NumberingSettings,
     OrderMode, PageSize, ShapeElement, TextField,
 )
-from app.ui.advanced_main_window import AdvancedMainWindow
+from app.ui.pro_main_window import ProMainWindow
 
 
 def _not_blank(path: Path) -> bool:
@@ -82,7 +82,7 @@ def main() -> None:
         mapping.append([item.get("numero") if item else None for item in page_items])
 
     app = QApplication.instance() or QApplication([])
-    window = AdvancedMainWindow()
+    window = ProMainWindow()
     window.resize(1500, 900)
     window.project.image_path = str(base_path)
     window.project.image_width = 720
@@ -90,6 +90,7 @@ def main() -> None:
     window.project.fields = fields
     window.project.elements = elements
     window.project.data = [row]
+    window.image_info.setText("Imagen: sample-ticket.png\n720 × 360 px")
     window.canvas.load_image(str(base_path))
     window.canvas.set_document(fields, elements)
     window.data_table.set_rows([row])
