@@ -32,9 +32,26 @@ def _draw_image(target: Image.Image, element: ImageElement) -> None:
             source = ImageOps.mirror(source)
         if element.flip_vertical:
             source = ImageOps.flip(source)
+        source = _crop_source(source, element)
         local = _fit_image(source, (element.width, element.height), element.fit_mode)
     _apply_opacity(local, element.opacity)
     _composite(target, local, element.x, element.y, element.width, element.height, element.rotation)
+
+
+def _crop_source(source: Image.Image, element: ImageElement) -> Image.Image:
+    left = max(0.0, min(0.95, float(element.crop_left)))
+    top = max(0.0, min(0.95, float(element.crop_top)))
+    right = max(0.0, min(0.95, float(element.crop_right)))
+    bottom = max(0.0, min(0.95, float(element.crop_bottom)))
+    if left + right >= 0.98:
+        right = max(0.0, 0.98 - left)
+    if top + bottom >= 0.98:
+        bottom = max(0.0, 0.98 - top)
+    x1 = round(source.width * left)
+    y1 = round(source.height * top)
+    x2 = max(x1 + 1, round(source.width * (1.0 - right)))
+    y2 = max(y1 + 1, round(source.height * (1.0 - bottom)))
+    return source.crop((x1, y1, x2, y2))
 
 
 def _draw_shape(target: Image.Image, element: ShapeElement) -> None:
