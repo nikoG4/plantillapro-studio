@@ -188,9 +188,9 @@ class ProductionMappingPanel(QWidget):
             candidate.production_source == "column" for candidate in variable_fields(self.fields)
         )
         self._set_form_field_visible(form, column, not numbering)
-        for key in ("start", "count", "step", "digits", "prefix", "suffix"):
+        for key in ("start", "step", "digits", "prefix", "suffix"):
             self._set_form_field_visible(form, widgets[key], numbering)  # type: ignore[arg-type]
-        widgets["count"].setEnabled(not list_drives_count)  # type: ignore[attr-defined]
+        self._set_form_field_visible(form, widgets["count"], numbering and not list_drives_count)  # type: ignore[arg-type]
 
         help_label: QLabel = widgets["help"]  # type: ignore[assignment]
         if numbering:
