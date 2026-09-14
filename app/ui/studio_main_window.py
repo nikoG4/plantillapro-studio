@@ -21,6 +21,7 @@ from app.ui.document_properties_panel import DocumentPropertiesPanel
 from app.ui.new_document_dialog import DocumentChoice, NewDocumentDialog
 from app.ui.pro_main_window import ProMainWindow
 from app.ui.studio_canvas_widget import StudioCanvasWidget
+from app.ui.studio_text_properties_panel import StudioTextPropertiesPanel
 
 
 class StudioMainWindow(ProMainWindow):
@@ -37,6 +38,9 @@ class StudioMainWindow(ProMainWindow):
         self._replace_canvas_with_studio_canvas()
         self._detach_legacy_docks()
         self.document_properties = DocumentPropertiesPanel(self._document_changed)
+        self.text_properties = StudioTextPropertiesPanel()
+        self.text_properties.changed.connect(self._text_properties_changed)
+        self.text_properties.advancedRequested.connect(self._show_advanced_text_options)
         self._build_top_toolbar()
         self._build_studio_pages()
         self._apply_studio_style()
@@ -132,9 +136,9 @@ class StudioMainWindow(ProMainWindow):
 
         primary = QHBoxLayout()
         primary.setSpacing(14)
-        primary.addWidget(self._welcome_action("＋", "Crear lienzo en blanco", "Empieza sin imagen de fondo", self.show_new_document_dialog))
-        primary.addWidget(self._welcome_action("▣", "Cargar imagen de fondo", "Usa una imagen como base", self.load_image))
-        primary.addWidget(self._welcome_action("▢", "Abrir proyecto", "Continúa donde lo dejaste", self.open_project))
+        primary.addWidget(self._welcome_action("Crear lienzo en blanco", "Empieza sin imagen de fondo", self.show_new_document_dialog))
+        primary.addWidget(self._welcome_action("Cargar imagen de fondo", "Usa una imagen como base", self.load_image))
+        primary.addWidget(self._welcome_action("Abrir proyecto", "Continúa donde lo dejaste", self.open_project))
         card_layout.addLayout(primary)
 
         divider = QFrame(); divider.setFrameShape(QFrame.Shape.HLine)
@@ -159,8 +163,8 @@ class StudioMainWindow(ProMainWindow):
         outer.addStretch()
         return page
 
-    def _welcome_action(self, icon: str, title: str, subtitle: str, slot) -> QPushButton:
-        button = QPushButton(f"{icon}\n{title}\n{subtitle}")
+    def _welcome_action(self, title: str, subtitle: str, slot) -> QPushButton:
+        button = QPushButton(f"{title}\n{subtitle}")
         button.setMinimumHeight(135)
         button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         button.clicked.connect(slot)
@@ -175,14 +179,14 @@ class StudioMainWindow(ProMainWindow):
         rail = QFrame(); rail.setObjectName("toolRail"); rail.setFixedWidth(105)
         rail_layout = QVBoxLayout(rail); rail_layout.setContentsMargins(10, 16, 10, 16); rail_layout.setSpacing(10)
         for text, slot in [
-            ("T\nTexto", self.add_field),
-            ("▣\nImagen", self.add_graphic_image),
-            ("○△\nForma", lambda: self.canvas.add_shape("rectangle")),
-            ("▦\nPlantillas", lambda: self.statusBar().showMessage("Plantillas: próximamente")),
+            ("Texto", self.add_field),
+            ("Imagen", self.add_graphic_image),
+            ("Forma", lambda: self.canvas.add_shape("rectangle")),
+            ("Plantillas", lambda: self.statusBar().showMessage("Plantillas: próximamente")),
         ]:
             btn = QPushButton(text); btn.setMinimumHeight(70); btn.clicked.connect(slot); rail_layout.addWidget(btn)
         rail_layout.addStretch()
-        bg = QPushButton("▧\nFondo"); bg.setMinimumHeight(62); bg.clicked.connect(self.load_image); rail_layout.addWidget(bg)
+        bg = QPushButton("Fondo"); bg.setMinimumHeight(62); bg.clicked.connect(self.load_image); rail_layout.addWidget(bg)
         root.addWidget(rail)
 
         center = QWidget(); center_layout = QVBoxLayout(center); center_layout.setContentsMargins(14, 12, 14, 12); center_layout.setSpacing(8)
@@ -208,8 +212,9 @@ class StudioMainWindow(ProMainWindow):
         self.right_tabs = QTabWidget()
         self.inspector_stack = QStackedWidget()
         self.inspector_stack.addWidget(self.document_properties)
-        self.inspector_stack.addWidget(self.properties)
+        self.inspector_stack.addWidget(self.text_properties)
         self.inspector_stack.addWidget(self.graphic_properties)
+        self.inspector_stack.addWidget(self.properties)
         self.right_tabs.addTab(self.inspector_stack, "Propiedades")
         self.right_tabs.addTab(self.layers, "Capas")
         right_layout.addWidget(self.right_tabs)
@@ -221,7 +226,8 @@ class StudioMainWindow(ProMainWindow):
 
     def _studio_selection_changed(self, item) -> None:
         if isinstance(item, TextField):
-            self.inspector_stack.setCurrentWidget(self.properties)
+            self.text_properties.set_field(item)
+            self.inspector_stack.setCurrentWidget(self.text_properties)
         elif isinstance(item, (ImageElement, ShapeElement)):
             self.inspector_stack.setCurrentWidget(self.graphic_properties)
         else:
@@ -231,6 +237,17 @@ class StudioMainWindow(ProMainWindow):
         for button in getattr(self, "quick_buttons", []):
             button.setEnabled(selected)
 
+    def _text_properties_changed(self) -> None:
+        self.canvas.update()
+        self.canvas.fieldsChanged.emit()
+
+    def _show_advanced_text_options(self) -> None:
+        field = self.canvas.selected_field()
+        if not field:
+            return
+        self.properties.set_field(field)
+        self.inspector_stack.setCurrentWidget(self.properties)
+
     def _build_production_page(self) -> QWidget:
         page = QWidget(); root = QHBoxLayout(page); root.setContentsMargins(18, 16, 18, 16); root.setSpacing(14)
         main = QWidget(); main_layout = QVBoxLayout(main); main_layout.setContentsMargins(0, 0, 0, 0)
@@ -238,7 +255,7 @@ class StudioMainWindow(ProMainWindow):
         subtitle = QLabel("Genera archivos listos para imprimir a partir de tu diseño y tus datos."); subtitle.setStyleSheet("color: #64748b;")
         main_layout.addWidget(title); main_layout.addWidget(subtitle)
 
-        steps = QLabel("① Datos     ② Numeración     ③ Imposición     ④ Exportación")
+        steps = QLabel("1  Datos      2  Numeración      3  Imposición      4  Exportación")
         steps.setStyleSheet("padding: 14px; background: white; border: 1px solid #e2e8f0; border-radius: 10px; font-weight: 700;")
         main_layout.addWidget(steps)
 
@@ -266,6 +283,7 @@ class StudioMainWindow(ProMainWindow):
         nf.addRow("Incremento", self.number_step); nf.addRow("Dígitos", self.number_digits); nf.addRow("Prefijo", self.number_prefix); nf.addRow("Sufijo", self.number_suffix)
         side.addWidget(numbering)
 
+        self.use_original_piece.setText("Usar tamaño del diseño")
         imposition = QGroupBox("3. Imposición"); imf = QFormLayout(imposition)
         imf.addRow("Hoja", self.size_combo); imf.addRow("DPI", self.dpi); imf.addRow(self.use_original_piece)
         imf.addRow("Ancho pieza mm", self.piece_w_mm); imf.addRow("Alto pieza mm", self.piece_h_mm)
