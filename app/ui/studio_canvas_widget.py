@@ -66,7 +66,7 @@ class StudioCanvasWidget(EnhancedCanvasWidget):
     def _paint_item(self, painter: QPainter, item: object) -> None:
         if isinstance(item, TextField) and item.is_variable():
             original = item.template
-            item.template = f"Campo: {item.name or item.variable_key()}"
+            item.template = item.name or item.variable_key()
             try:
                 super()._paint_item(painter, item)
             finally:
