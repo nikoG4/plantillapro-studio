@@ -10,8 +10,6 @@ on:
 permissions:
   contents: read
 
-# Each commit validates independently. GitHub occasionally leaves a cancelled Qt runner
-# in an in-progress state; keying by SHA prevents that stale run from blocking the next head.
 concurrency:
   group: editor-ci-${{ github.event.pull_request.number || github.ref }}-${{ github.sha }}
   cancel-in-progress: false
@@ -131,10 +129,12 @@ jobs:
         run: |
           $exe = Get-Item "dist\PlantillaProStudio\PlantillaProStudio.exe" -ErrorAction Stop
           if ($exe.Length -lt 1000000) { throw "El ejecutable parece inválido: $($exe.Length) bytes" }
-          $qml = Get-Item "dist\PlantillaProStudio\_internal\app\qml\Main.qml" -ErrorAction Stop
+          $qml = Get-Item "dist\PlantillaProStudio\_internal\app\qml\PolishedMain.qml" -ErrorAction Stop
+          $icon = Get-Item "dist\PlantillaProStudio\_internal\app\qml\StudioIcon.qml" -ErrorAction Stop
           "EXE: $($exe.FullName)" | Tee-Object -FilePath artifacts/build-verification.txt
           "Bytes: $($exe.Length)" | Tee-Object -Append -FilePath artifacts/build-verification.txt
-          "QML: $($qml.FullName)" | Tee-Object -Append -FilePath artifacts/build-verification.txt
+          "QML shell: $($qml.FullName)" | Tee-Object -Append -FilePath artifacts/build-verification.txt
+          "QML icons: $($icon.FullName)" | Tee-Object -Append -FilePath artifacts/build-verification.txt
           Get-FileHash $exe.FullName -Algorithm SHA256 | Format-List | Out-String | Tee-Object -Append -FilePath artifacts/build-verification.txt
 
       - name: Package Windows validation build
