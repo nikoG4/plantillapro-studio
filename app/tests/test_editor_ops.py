@@ -33,7 +33,9 @@ def test_snap_delta_to_canvas_center_and_other_object() -> None:
     assert dx == 140
     assert ("v", 250.0) in guides
 
-    other = shape("target", 300, 150, 100, 80)
-    dx, dy, guides = snap_delta(selected, 188, 128, (500, 400), [other], tolerance=6)
-    assert ("v", 300.0) in guides
+    # Put the target away from the canvas center so there is only one best vertical guide.
+    other = shape("target", 320, 150, 100, 80)
+    dx, dy, guides = snap_delta(selected, 208, 128, (500, 400), [other], tolerance=6)
+    assert dx == 210
+    assert ("v", 320.0) in guides
     assert ("h", 150.0) in guides
