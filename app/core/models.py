@@ -62,6 +62,7 @@ class TextField:
     locked: bool = False
     visible: bool = True
     z_index: int = 100
+    group_id: str = ""
 
 
 @dataclass
@@ -81,6 +82,11 @@ class ImageElement:
     fit_mode: str = "cover"  # cover | contain | stretch
     flip_horizontal: bool = False
     flip_vertical: bool = False
+    crop_left: float = 0.0
+    crop_top: float = 0.0
+    crop_right: float = 0.0
+    crop_bottom: float = 0.0
+    group_id: str = ""
     kind: str = "image"
 
 
@@ -102,6 +108,7 @@ class ShapeElement:
     stroke_color: str = "#111827"
     stroke_width: int = 2
     corner_radius: int = 0
+    group_id: str = ""
     kind: str = "shape"
 
 
