@@ -4,12 +4,12 @@ from pathlib import Path
 
 from PIL import Image
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QColor, QIcon
+from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
-    QApplication, QAbstractItemView, QCheckBox, QComboBox, QDialog, QFileDialog,
-    QFormLayout, QFrame, QGroupBox, QHBoxLayout, QLabel, QMainWindow, QMessageBox,
-    QPushButton, QProgressDialog, QScrollArea, QSizePolicy, QSpinBox, QStackedWidget,
-    QTabWidget, QToolBar, QToolButton, QVBoxLayout, QWidget,
+    QApplication, QDialog, QFileDialog, QFormLayout, QFrame, QGroupBox,
+    QHBoxLayout, QLabel, QMessageBox, QPushButton, QProgressDialog, QScrollArea,
+    QSizePolicy, QStackedWidget, QTabWidget, QToolBar, QToolButton, QVBoxLayout,
+    QWidget,
 )
 
 from app.core.document_base import document_base_path
@@ -42,7 +42,6 @@ class StudioMainWindow(ProMainWindow):
         self._apply_studio_style()
         self.show_welcome()
 
-    # ---------- shell ----------
     def _replace_canvas_with_studio_canvas(self) -> None:
         old = self.canvas
         canvas = StudioCanvasWidget()
@@ -109,7 +108,6 @@ class StudioMainWindow(ProMainWindow):
         self.pages.addWidget(self.production_page)
         self.setCentralWidget(self.pages)
 
-    # ---------- welcome ----------
     def _build_welcome_page(self) -> QWidget:
         page = QWidget()
         outer = QVBoxLayout(page)
@@ -168,7 +166,6 @@ class StudioMainWindow(ProMainWindow):
         button.clicked.connect(slot)
         return button
 
-    # ---------- design ----------
     def _build_design_page(self) -> QWidget:
         page = QWidget()
         root = QHBoxLayout(page)
@@ -234,7 +231,6 @@ class StudioMainWindow(ProMainWindow):
         for button in getattr(self, "quick_buttons", []):
             button.setEnabled(selected)
 
-    # ---------- production ----------
     def _build_production_page(self) -> QWidget:
         page = QWidget(); root = QHBoxLayout(page); root.setContentsMargins(18, 16, 18, 16); root.setSpacing(14)
         main = QWidget(); main_layout = QVBoxLayout(main); main_layout.setContentsMargins(0, 0, 0, 0)
@@ -255,7 +251,6 @@ class StudioMainWindow(ProMainWindow):
         buttons.addWidget(import_btn); buttons.addWidget(paste_btn); buttons.addWidget(add_btn); buttons.addStretch()
         data_layout.addLayout(buttons); data_layout.addWidget(self.data_table)
         main_layout.addWidget(data_group, 1)
-
         root.addWidget(main, 1)
 
         sidebar_scroll = QScrollArea(); sidebar_scroll.setWidgetResizable(True); sidebar_scroll.setFixedWidth(390)
@@ -283,10 +278,9 @@ class StudioMainWindow(ProMainWindow):
         images = QPushButton("Exportar PNG / JPG"); images.clicked.connect(self.generate_images)
         ex.addWidget(pdf); ex.addWidget(images)
         side.addWidget(export); side.addStretch()
-        sidebar_scroll.setWidget(side); root.addWidget(sidebar_scroll)
+        sidebar_scroll.setWidget(sidebar); root.addWidget(sidebar_scroll)
         return page
 
-    # ---------- navigation ----------
     def show_welcome(self) -> None:
         self.pages.setCurrentWidget(self.welcome_page)
         self.design_mode_btn.setChecked(False); self.production_mode_btn.setChecked(False)
@@ -306,7 +300,6 @@ class StudioMainWindow(ProMainWindow):
         self.pages.setCurrentWidget(self.production_page)
         self.design_mode_btn.setChecked(False); self.production_mode_btn.setChecked(True)
 
-    # ---------- project/document ----------
     def show_new_document_dialog(self, preset: str | None = None) -> None:
         dialog = NewDocumentDialog(self, preset)
         if dialog.exec() == QDialog.DialogCode.Accepted:
@@ -391,7 +384,6 @@ class StudioMainWindow(ProMainWindow):
             self.canvas.set_document(self.project.fields, self.project.elements)
         self._update_layout_info(); self.statusBar().showMessage("Lienzo actualizado")
 
-    # ---------- export ----------
     def open_generated_viewer(self) -> None:
         if not self._validate(require_output=False):
             return
