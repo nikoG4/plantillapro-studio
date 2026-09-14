@@ -20,7 +20,7 @@ class ProductionMappingPanel(QWidget):
         self.rows: list[dict[str, str]] = []
         self.export_settings = None
         self._syncing = False
-        self._cards: dict[str, dict[str, QWidget]] = {}
+        self._cards: dict[str, dict[str, object]] = {}
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -134,8 +134,8 @@ class ProductionMappingPanel(QWidget):
             form.addRow("", help_label)
             self.cards_layout.addWidget(box)
 
-            widgets = {
-                "source": source, "column": column, "start": start, "count": count,
+            widgets: dict[str, object] = {
+                "form": form, "source": source, "column": column, "start": start, "count": count,
                 "step": step, "digits": digits, "prefix": prefix, "suffix": suffix,
                 "help": help_label,
             }
@@ -159,10 +159,18 @@ class ProductionMappingPanel(QWidget):
         spin = QSpinBox(); spin.setRange(minimum, maximum); spin.setValue(value)
         return spin
 
+    @staticmethod
+    def _set_form_field_visible(form: QFormLayout, widget: QWidget, visible: bool) -> None:
+        label = form.labelForField(widget)
+        if label:
+            label.setVisible(visible)
+        widget.setVisible(visible)
+
     def _apply_field(self, field: TextField, emit: bool = True) -> None:
         widgets = self._cards.get(field.id)
         if not widgets:
             return
+        form: QFormLayout = widgets["form"]  # type: ignore[assignment]
         source: QComboBox = widgets["source"]  # type: ignore[assignment]
         column: QComboBox = widgets["column"]  # type: ignore[assignment]
         field.production_source = str(source.currentData())
@@ -179,18 +187,17 @@ class ProductionMappingPanel(QWidget):
         list_drives_count = bool(self.rows) and any(
             candidate.production_source == "column" for candidate in variable_fields(self.fields)
         )
-        column.setEnabled(not numbering)
-        for key in ("start", "step", "digits", "prefix", "suffix"):
-            widgets[key].setEnabled(numbering)
-        widgets["count"].setEnabled(numbering and not list_drives_count)
+        self._set_form_field_visible(form, column, not numbering)
+        for key in ("start", "count", "step", "digits", "prefix", "suffix"):
+            self._set_form_field_visible(form, widgets[key], numbering)  # type: ignore[arg-type]
+        widgets["count"].setEnabled(not list_drives_count)  # type: ignore[attr-defined]
+
         help_label: QLabel = widgets["help"]  # type: ignore[assignment]
         if numbering:
             sample = str(field.number_start).zfill(field.number_digits) if field.number_digits else str(field.number_start)
             example = f"{field.number_prefix}{sample}{field.number_suffix}"
             if list_drives_count:
-                help_label.setText(
-                    f"Ejemplo: {example}. La lista define la cantidad: {len(self.rows)} copia(s)."
-                )
+                help_label.setText(f"Ejemplo: {example}. La lista define la cantidad: {len(self.rows)} copia(s).")
             else:
                 help_label.setText(f"Ejemplo: {example}. Aquí la cantidad define cuántas copias se generan.")
         else:
