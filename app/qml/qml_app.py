@@ -46,10 +46,16 @@ def _load_qml_source(path: Path) -> bytes:
             'FieldBox{text:String(modelData.count);Layout.fillWidth:true;onEditingFinished:studio.setNumberSetting(modelData.id,"count",text)}',
             f'FieldBox{{text:String(({list_drives_count}) ? studio.dataRowCount : modelData.count);enabled:!({list_drives_count});Layout.fillWidth:true;onEditingFinished:studio.setNumberSetting(modelData.id,"count",text)}}',
         )
+
+        # Qt Quick's platform ComboBox clashes with the otherwise custom visual
+        # language. Route every selector in the polished shell through ModernSelect,
+        # which owns the closed state, hover/focus, chevron and popup styling.
         source = source.replace(
             'ComboBox { model:["Lista / columna","Numeración automática"];',
             'ComboBox { Layout.preferredWidth: 190; model:["Lista / columna","Numeración automática"];',
         )
+        source = source.replace("ComboBox {", "ModernSelect {")
+        source = source.replace("ComboBox{", "ModernSelect{")
     return source.encode("utf-8")
 
 
