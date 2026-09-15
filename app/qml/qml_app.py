@@ -56,6 +56,28 @@ def _load_qml_source(path: Path) -> bytes:
         )
         source = source.replace("ComboBox {", "ModernSelect {")
         source = source.replace("ComboBox{", "ModernSelect{")
+
+        # Static text should preview on the artboard while the user types. The bridge
+        # emits only projectChanged for the live path so the TextArea keeps its focus
+        # and cursor; losing focus performs the normal committed update.
+        source = source.replace(
+            'onEditingFinished:studio.setSelectedText(text)',
+            'onTextChanged: { if (activeFocus) studio.previewSelectedText(text) } '
+            'onActiveFocusChanged: { if (!activeFocus && visible) studio.setSelectedText(text) }',
+        )
+
+        # The design rail exposes a palette instead of hard-wiring one rectangle.
+        source = source.replace(
+            'ModernIconButton { Layout.alignment: Qt.AlignHCenter; iconKind: "shape"; tip: "Rectángulo"; onClicked: studio.addRectangle() }',
+            'ShapeToolButton { Layout.alignment: Qt.AlignHCenter }',
+        )
+
+        # Use the same shape renderer in the QML canvas that export uses conceptually,
+        # including triangles, diamonds and lines rather than a rectangle fallback.
+        source = source.replace(
+            'Rectangle { anchors.fill: parent; visible: modelData.kind === "shape"; color: modelData.fillColor || "#eef2ff"; border.color: modelData.strokeColor || "#c7d2fe"; border.width: Math.max(0, Number(modelData.strokeWidth || 0)*workspace.docScale); radius: modelData.shapeType === "ellipse" ? width/2 : Math.min(20, Number(modelData.cornerRadius || 0)*workspace.docScale) }',
+            'ShapePreview { anchors.fill: parent; visible: modelData.kind === "shape"; shapeType: modelData.shapeType || "rectangle"; fillColor: modelData.fillColor || "#eef2ff"; strokeColor: modelData.strokeColor || "#c7d2fe"; strokeWidth: Math.max(1, Number(modelData.strokeWidth || 0)*workspace.docScale); cornerRadius: Number(modelData.cornerRadius || 0)*workspace.docScale }',
+        )
     return source.encode("utf-8")
 
 
