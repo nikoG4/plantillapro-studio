@@ -62,9 +62,34 @@ def _draw_shape(target: Image.Image, element: ShapeElement) -> None:
     fill = ImageColor.getrgb(element.fill_color) + (255,)
     stroke = ImageColor.getrgb(element.stroke_color) + (255,)
     stroke_width = max(0, int(element.stroke_width))
-    box = (0, 0, max(0, element.width - 1), max(0, element.height - 1))
-    if element.shape_type == "ellipse":
+    inset = max(1, stroke_width // 2)
+    box = (inset, inset, max(inset, element.width - 1 - inset), max(inset, element.height - 1 - inset))
+    shape_type = (element.shape_type or "rectangle").lower()
+
+    if shape_type in {"ellipse", "circle"}:
         draw.ellipse(box, fill=fill, outline=stroke if stroke_width else None, width=stroke_width)
+    elif shape_type == "triangle":
+        points = [
+            (element.width // 2, inset),
+            (element.width - 1 - inset, element.height - 1 - inset),
+            (inset, element.height - 1 - inset),
+        ]
+        draw.polygon(points, fill=fill)
+        if stroke_width:
+            draw.line([*points, points[0]], fill=stroke, width=stroke_width, joint="curve")
+    elif shape_type == "diamond":
+        points = [
+            (element.width // 2, inset),
+            (element.width - 1 - inset, element.height // 2),
+            (element.width // 2, element.height - 1 - inset),
+            (inset, element.height // 2),
+        ]
+        draw.polygon(points, fill=fill)
+        if stroke_width:
+            draw.line([*points, points[0]], fill=stroke, width=stroke_width, joint="curve")
+    elif shape_type == "line":
+        y = element.height // 2
+        draw.line((inset, y, element.width - 1 - inset, y), fill=stroke, width=max(1, stroke_width))
     else:
         radius = max(0, min(int(element.corner_radius), element.width // 2, element.height // 2))
         draw.rounded_rectangle(box, radius=radius, fill=fill, outline=stroke if stroke_width else None, width=stroke_width)
